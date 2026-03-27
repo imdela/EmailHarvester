@@ -1,10 +1,4 @@
 """
-Plugin explicitly built to interface natively with the email harvester 'youtube' engine.
-"""
-
-from typing import Any
-
-"""
 This file is part of EmailHarvester
 Copyright (C) 2016 @maldevel
 https://github.com/maldevel/EmailHarvester
@@ -25,47 +19,36 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 For more see the file 'LICENSE' for copying permission.
+
+Plugin explicitly built to interface natively using Bing and Google site-search for YouTube.
 """
 
+from typing import Any
 
 app_emailharvester: Any = None
 
 
 def search(domain: str, limit: Any) -> list[str]:
+    """
+    Performs YouTube searching by aggregating results from Bing and Google.
+    """
     all_emails = []
-    app_emailharvester.show_message("[+] Searching in Youtube")
 
-    yahooUrl = "http://search.yahoo.com/search?p=site%3Ayoutube.com+%40{word}&n=100&ei=UTF-8&va_vt=any&vo_vt=any&ve_vt=any&vp_vt=any&vd=all&vst=0&vf=all&vm=p&fl=0&fr=yfp-t-152&xargs=0&pstart=1&b={counter}"
-    app_emailharvester.init_search(yahooUrl, domain, limit, 1, 100, "Yahoo + Youtube")
+    bing_url = "http://www.bing.com/search?q=site%3Ayoutube.com+%40{word}&count=50&first={counter}"
+    app_emailharvester.init_search(bing_url, domain, limit, 0, 50, "YouTube [Bing]")
     app_emailharvester.process()
-    all_emails += app_emailharvester.get_emails()
+    all_emails.extend(app_emailharvester.get_emails())
 
-    bingUrl = "http://www.bing.com/search?q=site%3Ayoutube.com+%40{word}&count=50&first={counter}"
-    app_emailharvester.init_search(bingUrl, domain, limit, 0, 50, "Bing + Youtube")
+    google_url = 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Ayoutube.com+"%40{word}"'
+    app_emailharvester.init_search(google_url, domain, limit, 0, 100, "YouTube [Google]")
     app_emailharvester.process()
-    all_emails += app_emailharvester.get_emails()
-
-    googleUrl = 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Ayoutube.com+"%40{word}"'
-    app_emailharvester.init_search(googleUrl, domain, limit, 0, 100, "Google + Youtube")
-    app_emailharvester.process()
-    all_emails += app_emailharvester.get_emails()
-
-    url = 'http://www.baidu.com/search/s?wd=site%3Ayoutube.com+"%40{word}"&pn={counter}'
-    app_emailharvester.init_search(url, domain, limit, 0, 10, "Baidu + Youtube")
-    app_emailharvester.process()
-    all_emails += app_emailharvester.get_emails()
-
-    url = "http://www.exalead.com/search/web/results/?q=site%3Ayoutube.com+%40{word}&elements_per_page=10&start_index={counter}"
-    app_emailharvester.init_search(url, domain, limit, 0, 50, "Exalead + Youtube")
-    app_emailharvester.process()
-    all_emails += app_emailharvester.get_emails()
+    all_emails.extend(app_emailharvester.get_emails())
 
     return all_emails
 
 
 class Plugin:
     def __init__(self, app: Any, conf: dict[str, Any]) -> None:
-
         app.register_plugin("youtube", {"search": search})
         global app_emailharvester
         app_emailharvester = app
