@@ -6,12 +6,12 @@ Refactor the EmailHarvester engine to move hardcoded search parameters (URLs, pa
 
 ## Acceptance Criteria
 
-- [ ] Add `PyYAML` and `types-PyYAML` to `requirements.txt`.
-- [ ] Create `src/engines_config.yaml` containing the search rules for all 12 supported plugins.
-- [ ] Update `src/core.py/EmailHarvester` to load and parse this YAML during initialization.
-- [ ] Refactor all 12 plugins in `src/plugins/` to retrieve their configuration dynamically from the `harvester` instance instead of using hardcoded constants.
-- [ ] Update unit tests to verify that the engine correctly handles missing or malformed configuration files.
-- [ ] Ensure Mypy, Ruff, and Pytest remain 100% green.
+- [x] Add `PyYAML` and `types-PyYAML` to `requirements.txt`.
+- [x] Create `src/config/engines.yaml` containing the search rules for all 12 supported plugins.
+- [x] Update `src/core.py/EmailHarvester` to load and parse this YAML during initialization.
+- [x] Refactor all 12 plugins in `src/plugins/` to retrieve their configuration dynamically from the `harvester` instance instead of using hardcoded constants.
+- [x] Update unit tests to verify that the engine correctly handles missing or malformed configuration files.
+- [x] Ensure Mypy, Ruff, and Pytest remain 100% green.
 
 ---
-**Status:** Open
+**Status:** COMPLETED
