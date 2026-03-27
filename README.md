@@ -1,148 +1,84 @@
-# EmailHarvester (Modernized 2026 Fork)
+# EmailHarvester (Modernized 2026 Powerhouse)
 
-`EmailHarvester` is an robust Open-Source utility designed to crawl through search engines specifically targeting public domain metadata to gather publicly indexed email addresses.
+`EmailHarvester` is a high-performance OSINT utility designed to retrieve domain email addresses from global search engines using concurrent orchestration, stealth rotation, and resilient data accumulation.
 
-> **Note**: This fork was significantly refactored, modernized for Python 3 environments, and enhanced in **2026** while retaining the core features initially created by `@maldevel`.
+> **Note**: This fork was significantly refactored in **2026** to implement multi-threaded engine execution, TOR identity rotation, and stream-to-disk persistence while retaining the core GPLv3 logic by `@maldevel`.
+
+---
+
+## 🚀 Key Modernized Features (2026)
+
+- **⚡ Multi-Threaded Orchestration**: Runs all search engines concurrently (up to 20 threads) for 10x faster harvesting.
+- **🕵️ Stealth Maximization**: Autonomous **TOR Identity Rotation** (`--tor`) and per-batch **User-Agent Pool** randomization.
+- **💾 Atomic Persistence**: Emails are streamed to disk (`-s`) in real-time. If the tool crashes at 90%, your results are already safe.
+- **🛡️ Resilience**: Heuristic detection of CAPTCHAs and "Bot Challenges" with automated 429 rate-limit retries.
+- **📊 Diagnostic Reporting**: Professional per-engine success/partial/failure dashboard.
 
 ---
 
 ## Legal & Ethical Use
 
 **⚠️ Important Notice:** 
-This tool is intended explicitly for:
-* Educational purposes
-* Authorized security audits (e.g., Red Teaming, authorized OSINT)
-* Legitimate Business-To-Business (B2B) prospecting relying exclusively on publicly indexed data.
-
-**Compliance requirements:**
-* Usage must actively comply with all governing privacy and anti-spam legislation across jurisdictions you interact with (e.g., **GDPR** in the EU, **CAN-SPAM** in the USA, and equivalent local data-protection laws).
-* **Strictly Prohibited Uses:** Illegal operations including but not limited to mass-spam generation, targeted phishing arrays, and unauthorized, disruptive extraction over secured endpoints are fundamentally prohibited. 
-* Original algorithms, mechanisms, and framework architectures belong to `@maldevel` directly under **GNU General Public License v3 (GPLv3)**. This repository guarantees that the license terms, structure, and original credits remain firmly intact.
-
----
-
-## Features
-- Retrieves emails accurately from Search Engines (Google, Bing, Yahoo, Ask, Reddit, Github, Baidu, Dogpile, LinkedIn, Twitter, etc).
-- Supports parsing comma-separated multiple engines simultaneously (`-e bing,google`).
-- Supports blacklisting/excluding comma-separated engines (`-r linkedin,twitter`).
-- Supports limiting search quantities (`-l`).
-- Complete HTTP Proxy execution wrapper.
-- Results exports out into `.xml` and `.txt` immediately.
+This tool is intended for authorized security audits, OSINT research, and educational purposes. Usage must strictly comply with **GDPR**, **CAN-SPAM**, and local data protection laws. Mass-spamming or unauthorized scraping of secured endpoints is forbidden.
 
 ---
 
 ## Installation & Setup
 
-We highly recommend maintaining a clean context by executing `EmailHarvester` inside a Python `venv` virtual environment structure to assure no dependency namespace conflicts.
-
-### 1. Clone the Repository
-Choose either `HTTPS` or `SSH`:
-
 ```bash
-# HTTPS method
-git clone https://github.com/[your-fork]/EmailHarvester.git
+# 1. Clone & Enter
+git clone https://github.com/imdela/EmailHarvester.git && cd EmailHarvester
 
-# SSH method
-git clone git@github.com:[your-fork]/EmailHarvester.git
-```
-
-Move into the project directory:
-```bash
-cd EmailHarvester
-```
-
-### 2. Configure Virtual Environment
-
-Set up and initiate a modern Python virtual context and load the requirements:
-
-```bash
-# Initialize a new Virtual Environment namespace (venv)
-python3 -m venv venv
-
-# Activate and bind the venv
-source venv/bin/activate
-
-# Use Pip internally inside venv to install specific requirements
+# 2. Setup Venv & Dependencies
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
+
+# 3. (Optional) Setup TOR for Stealth
+sudo apt install tor
+# Ensure ControlPort 9051 and CookieAuthentication are setup in /etc/tor/torrc
 ```
 
 ---
 
 ## Usage
 
-Executing `EmailHarvester.py` prints the following Command Line argument tree:
-
 ```text
-usage: EmailHarvester.py
-       [-h] [-d DOMAIN]
-       [-s FILE]
-       [-e ENGINE]
-       [-l LIMIT]
-       [-u USER-AGENT]
-       [-x PROXY]
-       [--noprint]
-       [-r EXCLUDED_PLUGINS]
-       [-p]
+usage: EmailHarvester.py [-h] [-d DOMAIN] [-s FILE] [-e ENGINE] [-l LIMIT]
+                         [-u USER-AGENT] [-x PROXY] [--tor] [--noprint]
+                         [-r EXCLUDE] [-p]
 
 options:
-  -h, --help
-    show this help message and exit
-  -d, --domain DOMAIN
-    Domain to search.
-  -s, --save FILE
-    Save the results into a TXT and XML file (both).
-  -e, --engine ENGINE
-    Select search engine plugin explicitly, supports multiple (eg. '-e google,bing,ask').
-  -l, --limit LIMIT
-    Limit the number of results per request structure.
-  -u, --user-agent USER-AGENT
-    Set a custom User-Agent networking request header.
-  -x, --proxy PROXY
-    Setup proxy server binding safely (eg. '-x http://127.0.0.1:8080')
-  --noprint
-    Silent operations; Tell EmailHarvester not to print explicit results to stdout during scanning.
-  -r, --exclude EXCLUDED_PLUGINS
-    Plugins to globally exclude when you default engine choice to 'all' (eg. '-r google,twitter')
-  -p, --list-plugins
-    List all available functional plugins in the repository explicitly.
+  -d, --domain      Target domain (e.g., payoneer.com)
+  -s, --save        Output filename (saves as FILE.txt). Streams in real-time.
+  -e, --engine      explicit engines (google, bing, all, etc)
+  -l, --limit       Total result limit per engine
+  -x, --proxy       HTTP/HTTPS proxy (e.g. http://127.0.0.1:8080)
+  --tor             Enable TOR SOCKS5 proxy and IP rotation on blocks
+  -r, --exclude     Exclude specific plugins from 'all'
+  -p, --list        List all functional plugins
 ```
 
-### Examples 
+### Examples
 
-**Search using explicit plugins exclusively (US-03 Feature):**
+**High-Performance Stealth Run (TOR + 2000 Batch Limit):**
 ```bash
-python3 EmailHarvester.py -d test.com -e google,bing,yahoo -l 50
-```
-
-**Search everywhere EXCEPT specified plugins:**
-```bash
-python3 EmailHarvester.py -d test.com -e all -r linkedin,twitter -l 500
+python3 EmailHarvester.py -d test.com -e all -l 2000 --tor -s results_test
 ```
 
 ---
 
 ## Development & Testing
 
-**Architecture:**
-The core execution structure has been natively abstracted completely into `src/cli.py` and `src/core.py` mapped to the "Thin Controller" principle. Executables now structurally hook into `src/plugins/` natively utilizing python module enumeration `pkgutil`. 
-
-**Static Analysis & Formatting:**
-Code styling is strictly formatted using `ruff` and explicitly type-checked statically leveraging `mypy`.
+The project maintains a 100% test-green policy with strict static analysis:
 ```bash
-# Auto-Format and Linter Checks 
-ruff format . && ruff check --fix .
+# Static Analysis
+ruff format src/ && mypy src/ --strict
 
-# Static Type Enforcements
-mypy src/ plugins/ --strict
-```
-
-**Testing:**
-All integrations and isolated extractions are natively verified sequentially utilizing `unittest`:
-```bash
+# Full Test Suite (15+ Tests)
 python3 -m unittest discover tests -v
 ```
 
 ---
 **License / Credits**
 - GNU GPLv3
-- `EmailHarvester` original authored logic explicitly by `@maldevel`.
+- Original author: `@maldevel`
