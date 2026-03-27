@@ -145,6 +145,7 @@ class Settings(BaseSettings):
     tor_host: str = Field(default="127.0.0.1", description="Local/Remote TOR host address")
     tor_port: int = Field(default=9050, description="TOR SOCKS5 port")
     tor_control_port: int = Field(default=9051, description="TOR Control port")
+    tor_control_password: str = Field(default="emailharvester_secret", description="TOR Control password")
     timeout: int = Field(default=12, description="HTTP request timeout in seconds", gt=0)
 
     model_config = SettingsConfigDict(env_prefix="EH_")
@@ -196,8 +197,10 @@ class EmailHarvester:
         Commands the local TOR service to rotate the circuit and provide a new IP. (US-12)
         """
         try:
-            with Controller.from_port(port=self.settings.tor_control_port) as controller:
-                controller.authenticate()  # Requires password if set, or just cookie
+            with Controller.from_port(
+                address=self.settings.tor_host, port=self.settings.tor_control_port
+            ) as controller:
+                controller.authenticate(password=self.settings.tor_control_password)
                 controller.signal(Signal.NEWNYM)
                 return True
         except Exception:

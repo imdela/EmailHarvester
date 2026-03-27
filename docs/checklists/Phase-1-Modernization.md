@@ -12,7 +12,7 @@
 - [x] Fix LinkedIn Plugin URL Format - TI-06 (Completed)
 - [ ] Docstrings Compliance (Rule 6) - TI-07 (Planned)
 - [x] Pytest Framework Integration (Rule 3) - TI-08 (Completed)
-- [ ] Dockerized TOR Integration - US-20 (Planned)
+- [x] Dockerized TOR Integration - US-20 (Completed)
 - [ ] API Foundation (FastAPI) (Planned)
 
 ## Quality Gates

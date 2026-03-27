@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  tor:
+    image: barneybuffet/tor
+    container_name: tor-proxy
+    environment:
+      - TOR_CONTROL_PASSWORD=emailharvester_secret
+      - TOR_CONTROL=true
+    ports:
+      - "9050:9050"
+      - "9051:9051"
+    restart: unless-stopped
+    networks:
+      - harvester_net
+
+  emailharvester:
+    build: .
+    container_name: email-harvester
+    environment:
+      - EH_TOR_HOST=tor
+      - EH_TOR_PORT=9050
+      - EH_TOR_CONTROL_PORT=9051
+      - EH_TOR_CONTROL_PASSWORD=emailharvester_secret
+    depends_on:
+      - tor
+    networks:
+      - harvester_net
+    entrypoint: ["python3", "-m", "src.cli"]
+    # Provide default arguments so the container does not exit rapidly, 
+    # but normally users will override the command via docker-compose run.
+    command: ["-h"]
+
+networks:
+  harvester_net:
+    driver: bridge
