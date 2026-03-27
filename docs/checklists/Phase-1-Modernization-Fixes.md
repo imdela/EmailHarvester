@@ -11,7 +11,7 @@ This checklist tracks the remediation steps required to close the gaps identifie
 - [x] **Fix TI-04 (Pydantic Fail-Fast Tests)**:
   - Create a test case (e.g., in `tests/test_settings.py`) explicitly proving that an invalid environment configuration (like `EH_TIMEOUT=-5`) triggers a `ValidationError` preventing unsafe engine startup.
 
-- [ ] **Fix TI-05 (Stealth Jitter Unit Tests)**:
+- [x] **Fix TI-05 (Stealth Jitter Unit Tests)**:
   - Add a dedicated test in `tests/test_stealth.py` that verifies the engine correctly tracks its `burst_count` and triggers the long `time.sleep` (15-30s) strictly on the 5th request iteration.
 
 - [ ] **Fix TI-07 (Plugin Layer Docstrings)**:
