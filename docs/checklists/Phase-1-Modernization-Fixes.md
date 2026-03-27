@@ -4,7 +4,7 @@ This checklist tracks the remediation steps required to close the gaps identifie
 
 ## Outstanding Technical Debt
 
-- [ ] **Fix TI-03 (Exception Handling in CLI & Plugins)**:
+- [x] **Fix TI-03 (Exception Handling in CLI & Plugins)**:
   - Update `src/cli.py` to intercept `RateLimitError`, `ForbiddenError`, and `SearchBlockedError`, formatting them into user-friendly Rich dashboard messages rather than a generic `Exception`.
   - Replace the bare `RuntimeError` explicitly raised inside `src/plugins/ask.py` using our new custom hierarchy.
 

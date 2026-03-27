@@ -29,6 +29,8 @@ from typing import Any
 import requests
 from termcolor import colored
 
+from src.core import EmailHarvesterError
+
 config: Any = None
 app_emailharvester: Any = None
 
@@ -68,7 +70,7 @@ class AskSearch(object):
                 r = requests.get(urly, headers=headers)
 
         except Exception as e:
-            raise RuntimeError(f"Network error in ASK: {e}") from e
+            raise EmailHarvesterError(f"Network error in ASK: {e}") from e
 
         if r.encoding is None:
             r.encoding = "UTF-8"

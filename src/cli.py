@@ -39,6 +39,10 @@ from rich.progress import (
 
 from src.core import (
     EmailHarvester,
+    EmailHarvesterError,
+    ForbiddenError,
+    RateLimitError,
+    SearchBlockedError,
     __version__,
     checkDomain,
     checkProxyUrl,
@@ -307,8 +311,22 @@ def main() -> None:
                     res, status = future.result()
                     final_emails.extend(res)
                     engine_stats.append((engine_name, len(res), status))
+                except RateLimitError as e:
+                    progress.console.print(yellow(f"[~] Rate limit hit for '{engine_name}': {e}"))
+                    engine_stats.append((engine_name, 0, "FAILED_RATE_LIMIT"))
+                except SearchBlockedError as e:
+                    progress.console.print(yellow(f"[~] Captcha block in '{engine_name}': {e}"))
+                    engine_stats.append((engine_name, 0, "PARTIAL_CAPTCHA"))
+                except ForbiddenError as e:
+                    progress.console.print(red(f"[-] Access forbidden to '{engine_name}': {e}"))
+                    failed_engines.append(engine_name)
+                    engine_stats.append((engine_name, 0, "FAILED_FORBIDDEN"))
+                except EmailHarvesterError as e:
+                    progress.console.print(red(f"[-] Error in thread '{engine_name}': {e}"))
+                    failed_engines.append(engine_name)
+                    engine_stats.append((engine_name, 0, "FAILED"))
                 except Exception as e:
-                    progress.console.print(red(f"[-] Fatal error in thread '{engine_name}': {e}"))
+                    progress.console.print(red(f"[-] Fatal unknown error in thread '{engine_name}': {e}"))
                     failed_engines.append(engine_name)
                     engine_stats.append((engine_name, 0, "FATAL_ERROR"))
 
