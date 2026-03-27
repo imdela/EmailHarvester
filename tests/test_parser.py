@@ -5,7 +5,7 @@ import unittest
 # Insert project root to path for importing EmailHarvester
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
-    from EmailHarvester import MyParser
+    from src.core import MyParser
 except ImportError as e:
     print(f"Failed to import MyParser: {e}")
     sys.exit(1)
