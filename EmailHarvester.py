@@ -387,10 +387,12 @@ if __name__ == "__main__":
                 for email in all_emails:
                     try:
                         out_file.write(email + "\n")
-                    except:
-                        print(red("[-] Exception: " + email))
+                    except Exception as email_err:
+                        print(
+                            red("[-] Exception writing {}: {}".format(email, email_err))
+                        )
         except Exception as e:
-            print(red("[-] Error saving TXT file: " + e))
+            print(red("[-] Error saving TXT file: " + str(e)))
 
         try:
             filename = filename.split(".")[0] + ".xml"
@@ -401,4 +403,4 @@ if __name__ == "__main__":
                 out_file.write("</EmailHarvester>")
             print(green("[+] Files saved"))
         except Exception as er:
-            print(red("[-] Error saving XML file: " + er))
+            print(red("[-] Error saving XML file: " + str(er)))
