@@ -6,7 +6,7 @@
 - [x] Stream-to-Disk persistence (US-13)
 - [ ] Deep-scraping logic (Visit links) - TI-01 (In Progress)
 - [ ] Self-Healing Plugin (Probes) - TI-02 (Planned)
-- [ ] Custom Exception Hierarchy (Rule 10) - TI-03 (Planned)
+- [x] Custom Exception Hierarchy (Rule 10) - TI-03 (Completed)
 - [x] Pydantic Settings Schema (Rule 7) - TI-04 (Completed)
 - [ ] Stealth Burst & Rest Jitter (US-12) - TI-05 (Planned)
 - [x] Fix LinkedIn Plugin URL Format - TI-06 (Completed)

@@ -116,14 +116,35 @@ class SearchStatus(StrEnum):
     FAILED_RATE_LIMIT = "FAILED_RATE_LIMIT"
 
 
+class EmailHarvesterError(Exception):
+    """Base exception for all EmailHarvester errors."""
+
+
+class RateLimitError(EmailHarvesterError):
+    """Raised when an engine enforces a 429 Too Many Requests status."""
+
+
+class ForbiddenError(EmailHarvesterError):
+    """Raised when an engine enforces a 403 Forbidden status."""
+
+
+class SearchBlockedError(EmailHarvesterError):
+    """Raised when a Captcha or Bot Protection is detected in the response body."""
+
+
+class PluginConfigurationError(EmailHarvesterError):
+    """Raised when a plugin has an invalid setup or URL format."""
+
+
 class Settings(BaseSettings):
     """
     Validates and centralizes initial environment configurations for EmailHarvester.
     """
 
     user_agent_platform: str = Field(default="desktop", description="Platform for fake-useragent")
-    tor_port: int = Field(default=9050, description="Local TOR SOCKS5 port")
-    tor_control_port: int = Field(default=9051, description="Local TOR Control port")
+    tor_host: str = Field(default="127.0.0.1", description="Local/Remote TOR host address")
+    tor_port: int = Field(default=9050, description="TOR SOCKS5 port")
+    tor_control_port: int = Field(default=9051, description="TOR Control port")
     timeout: int = Field(default=12, description="HTTP request timeout in seconds", gt=0)
 
     model_config = SettingsConfigDict(env_prefix="EH_")
@@ -241,8 +262,8 @@ class EmailHarvester:
             proxies = None
             if self.tor_enabled:
                 proxies = {
-                    "http": f"socks5h://127.0.0.1:{self.settings.tor_port}",
-                    "https": f"socks5h://127.0.0.1:{self.settings.tor_port}",
+                    "http": f"socks5h://{self.settings.tor_host}:{self.settings.tor_port}",
+                    "https": f"socks5h://{self.settings.tor_host}:{self.settings.tor_port}",
                 }
             elif self.proxy:
                 proxies = {self.proxy.scheme: "http://" + self.proxy.netloc}
@@ -251,10 +272,10 @@ class EmailHarvester:
 
             if r.status_code == 429:
                 self.status = SearchStatus.FAILED_RATE_LIMIT
-                raise RuntimeError("429 Rate Limit")
+                raise RateLimitError("429 Rate Limit")
             if r.status_code == 403:
                 self.status = SearchStatus.FAILED_FORBIDDEN
-                raise RuntimeError("403 Forbidden")
+                raise ForbiddenError("403 Forbidden")
             r.raise_for_status()
 
             if r.encoding is None:
@@ -264,7 +285,7 @@ class EmailHarvester:
             block_markers = ["captcha", "unusual traffic", "automated requests", "g-recaptcha"]
             if any(marker in self.results.lower() for marker in block_markers):
                 self.status = SearchStatus.PARTIAL_CAPTCHA
-                raise RuntimeError("Bot challenge detected")
+                raise SearchBlockedError("Bot challenge detected")
 
             # Parse and Save in Real-Time (US-13 Persistence)
             prev_emails = set(self.parser.emails())
@@ -278,12 +299,14 @@ class EmailHarvester:
 
         except requests.exceptions.Timeout as e:
             self.status = SearchStatus.FAILED_TIMEOUT
-            raise RuntimeError(f"Connection timeout in {self.activeEngine}") from e
+            raise EmailHarvesterError(f"Connection timeout in {self.activeEngine}") from e
+        except EmailHarvesterError:
+            raise
         except Exception as e:
             # Maintain the existing status if already set; otherwise use partial block
             if self.status == SearchStatus.SUCCESS:
                 self.status = SearchStatus.PARTIAL_BLOCKED
-            raise RuntimeError(f"Engine interrupted: {e}") from e
+            raise EmailHarvesterError(f"Engine interrupted: {e}") from e
 
     def process(self) -> None:
         """
@@ -293,7 +316,7 @@ class EmailHarvester:
             try:
                 self.do_search()
                 self.retry_count = 0  # Reset on success
-            except RuntimeError:
+            except EmailHarvesterError:
                 # TOR Identity Refresh on failure (US-12)
                 if (
                     self.status in [SearchStatus.FAILED_RATE_LIMIT, SearchStatus.PARTIAL_CAPTCHA]
