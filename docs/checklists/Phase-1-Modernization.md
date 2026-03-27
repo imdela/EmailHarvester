@@ -8,7 +8,7 @@
 - [ ] Self-Healing Plugin (Probes) - TI-02 (Planned)
 - [x] Custom Exception Hierarchy (Rule 10) - TI-03 (Completed)
 - [x] Pydantic Settings Schema (Rule 7) - TI-04 (Completed)
-- [ ] Stealth Burst & Rest Jitter (US-12) - TI-05 (Planned)
+- [x] Stealth Burst & Rest Jitter (US-12) - TI-05 (Completed)
 - [x] Fix LinkedIn Plugin URL Format - TI-06 (Completed)
 - [ ] Docstrings Compliance (Rule 6) - TI-07 (Planned)
 - [x] Pytest Framework Integration (Rule 3) - TI-08 (Completed)

@@ -181,6 +181,8 @@ class EmailHarvester:
         self.retry_count = 0
         self.results = ""
         self.totalresults = ""
+        self.burst_count = 0
+        self.burst_limit = 5
         plugins: dict[str, Any] = {}
         import src.plugins
 
@@ -316,6 +318,7 @@ class EmailHarvester:
             try:
                 self.do_search()
                 self.retry_count = 0  # Reset on success
+                self.burst_count += 1
             except EmailHarvesterError:
                 # TOR Identity Refresh on failure (US-12)
                 if (
@@ -343,10 +346,26 @@ class EmailHarvester:
                     self.progress_callback(self.task_id, description=f"[red]{self.activeEngine} ({str(self.status)})")
                 break
 
-            time.sleep(random.uniform(0.7, 1.8))
+            # TI-05 Stealth Burst & Rest Jitter Logic
+            if self.burst_count >= self.burst_limit:
+                rest_time = random.uniform(15.0, 30.0)
+                if self.progress_callback and self.task_id is not None:
+                    self.progress_callback(
+                        self.task_id, description=f"[yellow]Resting for {rest_time:.1f}s ({self.activeEngine})..."
+                    )
+                else:
+                    print(yellow(f"[~] Resting {self.activeEngine} for {rest_time:.1f}s to evade detection..."))
+
+                time.sleep(rest_time)
+                self.burst_count = 0
+            else:
+                time.sleep(random.uniform(0.7, 1.8))
+
             self.counter += self.step
             if self.progress_callback and self.task_id is not None:
-                self.progress_callback(self.task_id, advance=self.step)
+                self.progress_callback(
+                    self.task_id, advance=self.step, description=f"[cyan]Searching in {self.activeEngine}..."
+                )
             else:
                 print(green(f"[+] Searching in {self.activeEngine}:") + cyan(f" {str(self.counter)} results"))
 
