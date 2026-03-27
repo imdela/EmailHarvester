@@ -40,3 +40,26 @@ class TestEmailHarvesterCLI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestCliExecution(unittest.TestCase):
+    def test_run_thread_returns_tuple(self):
+        """
+        US-09/11: Verifies thread workers return the required tuple structure (emails, status).
+        """
+        from src.cli import run_engine_thread
+        from unittest.mock import MagicMock, patch
+        
+        with patch("src.cli.EmailHarvester") as mock_app:
+            # Setup mock search engine
+            mock_plugin = {"search": MagicMock(return_value=["test@domain.com"])}
+            mock_app.return_value.get_plugins.return_value = {"bing": mock_plugin}
+            mock_app.return_value.status = "SUCCESS"
+            
+            mock_progress = MagicMock()
+            
+            result, status = run_engine_thread(
+                "bing", "domain.com", 1, "UA", None, False, mock_progress
+            )
+            
+            self.assertEqual(result, ["test@domain.com"])
+            self.assertEqual(status, "SUCCESS")
