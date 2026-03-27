@@ -1,15 +1,24 @@
-version: '3.8'
-
 services:
   tor:
-    image: barneybuffet/tor
+    image: dockage/tor-privoxy:latest
     container_name: tor-proxy
     environment:
       - TOR_CONTROL_PASSWORD=emailharvester_secret
-      - TOR_CONTROL=true
+      - TOR_CONTROL_PORT=9051
     ports:
       - "9050:9050"
       - "9051:9051"
+      - "8118:8118"
+    tmpfs:
+      - /run
+      - /run/lock
+      - /sys/fs/cgroup
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9050 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
     networks:
       - harvester_net
@@ -23,7 +32,8 @@ services:
       - EH_TOR_CONTROL_PORT=9051
       - EH_TOR_CONTROL_PASSWORD=emailharvester_secret
     depends_on:
-      - tor
+      tor:
+        condition: service_healthy
     networks:
       - harvester_net
     entrypoint: ["python3", "-m", "src.cli"]

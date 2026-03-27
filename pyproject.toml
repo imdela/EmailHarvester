@@ -19,3 +19,7 @@ markers = [
     "functional: Mock testing logic and loops",
     "integration: Actual infrastructure validation communicating via local networking like Docker",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:stem.*",
+    "ignore:.*setDaemon.*:DeprecationWarning",
+]
