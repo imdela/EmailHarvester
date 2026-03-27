@@ -120,6 +120,29 @@ python3 EmailHarvester.py -d test.com -e all -r linkedin,twitter -l 500
 ```
 
 ---
+
+## Development & Testing
+
+**Architecture:**
+The core execution structure has been natively abstracted completely into `src/cli.py` and `src/core.py` mapped to the "Thin Controller" principle. Executables now structurally hook into `src/plugins/` natively utilizing python module enumeration `pkgutil`. 
+
+**Static Analysis & Formatting:**
+Code styling is strictly formatted using `ruff` and explicitly type-checked statically leveraging `mypy`.
+```bash
+# Auto-Format and Linter Checks 
+ruff format . && ruff check --fix .
+
+# Static Type Enforcements
+mypy src/ plugins/ --strict
+```
+
+**Testing:**
+All integrations and isolated extractions are natively verified sequentially utilizing `unittest`:
+```bash
+python3 -m unittest discover tests -v
+```
+
+---
 **License / Credits**
 - GNU GPLv3
 - `EmailHarvester` original authored logic explicitly by `@maldevel`.
