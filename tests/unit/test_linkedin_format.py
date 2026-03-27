@@ -15,11 +15,8 @@ def test_url_formatting_placeholders() -> None:
     def mock_init(url: str, *args: Any, **kwargs: Any) -> None:
         captured_urls.append(url)
 
-    mock_app.init_search = mock_init
-    linkedin.app_emailharvester = mock_app
-
     # Trigger plugin search
-    linkedin.search("example.com", 10)
+    linkedin.search("example.com", 10, mock_app)
 
     # Inspect captured URLs
     for url in captured_urls:

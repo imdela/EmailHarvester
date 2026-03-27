@@ -1,10 +1,4 @@
 """
-Plugin explicitly built to interface natively with the email harvester 'baidu' engine.
-"""
-
-from typing import Any
-
-"""
 This file is part of EmailHarvester
 Copyright (C) 2016 @maldevel
 https://github.com/maldevel/EmailHarvester
@@ -25,32 +19,38 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 For more see the file 'LICENSE' for copying permission.
+
+Plugin explicitly built to interface natively with the email harvester 'baidu' engine.
 """
 
+from typing import Any
 
-app_emailharvester: Any = None
 
-
-def search(domain: str, limit: Any) -> list[str]:
-    """
-    Executes the search and harvest sequence for this specific engine.
+def search(domain: str, limit: int, harvester: Any) -> list[str]:
+    """Executes the search and harvest sequence for the Baidu engine.
 
     Args:
-        domain (str): The target domain to harvest email addresses for.
-        limit (Any): The maximum number of search result pages/items to parse.
+        domain: The target domain to harvest email addresses for.
+        limit: The maximum number of search result pages/items to parse.
+        harvester: The EmailHarvester instance to use for processing.
 
     Returns:
-        list[str]: A list of harvested email addresses.
+        A list of harvested email addresses.
     """
     url = 'http://www.baidu.com/search/s?wd="%40{word}"&pn={counter}'
-    app_emailharvester.init_search(url, domain, limit, 0, 10, "Baidu")
-    app_emailharvester.process()
-    return list(app_emailharvester.get_emails())
+    harvester.init_search(url, domain, limit, 0, 10, "Baidu")
+    harvester.process()
+    return list(harvester.get_emails())
 
 
 class Plugin:
-    def __init__(self, app: Any, conf: dict[str, Any]) -> None:
+    """Plugin bridge for the Baidu search engine."""
 
+    def __init__(self, app: Any, _conf: dict[str, Any]) -> None:
+        """Initializes the plugin and registers its search method.
+
+        Args:
+            app: The parent EmailHarvester orchestrator to register with.
+            _conf: Configuration dictionary containing User-Agent and proxy settings.
+        """
         app.register_plugin("baidu", {"search": search})
-        global app_emailharvester
-        app_emailharvester = app

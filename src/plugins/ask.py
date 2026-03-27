@@ -1,6 +1,4 @@
 """
-Plugin explicitly built to interface natively with the email harvester 'ask' engine.
-
 This file is part of EmailHarvester
 Copyright (C) 2016 @maldevel
 https://github.com/maldevel/EmailHarvester
@@ -21,95 +19,42 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 For more see the file 'LICENSE' for copying permission.
+
+Plugin explicitly built to interface natively with the email harvester 'ask' engine.
 """
 
-import time
 from typing import Any
 
-import requests
-from termcolor import colored
 
-from src.core import EmailHarvesterError
+def search(domain: str, limit: int, harvester: Any) -> list[str]:
+    """Executes the search and harvest sequence for the Ask.com engine.
 
-config: Any = None
-app_emailharvester: Any = None
-
-
-def green(text: str) -> str:
-    return colored(text, "green", attrs=["bold"])
-
-
-def red(text: str) -> str:
-    return colored(text, "red", attrs=["bold"])
-
-
-def cyan(text: str) -> str:
-    return colored(text, "cyan", attrs=["bold"])
-
-
-class AskSearch(object):
-    def __init__(self, url: str, word: str, limit: int | str) -> None:
-        self.results = ""
-        self.totalresults = ""
-        self.limit = int(limit)
-        self.page = 1
-        self.url = url
-        self.word = word
-        self.proxy = config["proxy"]
-        self.userAgent = config["useragent"]
-        self.counter = 0
-
-    def do_search(self) -> None:
-        try:
-            urly = self.url.format(page=str(self.page), word=self.word)
-            headers = {"User-Agent": self.userAgent}
-            if self.proxy:
-                proxies = {self.proxy.scheme: "http://" + self.proxy.netloc}
-                r = requests.get(urly, headers=headers, proxies=proxies)
-            else:
-                r = requests.get(urly, headers=headers)
-
-        except Exception as e:
-            raise EmailHarvesterError(f"Network error in ASK: {e}") from e
-
-        if r.encoding is None:
-            r.encoding = "UTF-8"
-        self.results = r.content.decode(r.encoding)
-        self.totalresults += self.results
-
-    def process(self) -> None:
-        while self.counter < self.limit:
-            self.do_search()
-            time.sleep(1)
-            self.counter += 10
-            self.page += 1
-            print(green("[+] Searching in ASK:") + cyan(" {} results".format(str(self.counter))))
-
-    def get_emails(self) -> list[str]:
-        app_emailharvester.parser.extract(self.totalresults, self.word)
-        return list(app_emailharvester.parser.emails())
-
-
-def search(domain: str, limit: Any) -> list[str]:
-    """
-    Executes the search and harvest sequence for this specific engine.
+    Refactored to use the parent harvester's search cycle for consistent
+    stealth and networking management.
 
     Args:
-        domain (str): The target domain to harvest email addresses for.
-        limit (Any): The maximum number of search result pages/items to parse.
+        domain: The target domain to harvest email addresses for.
+        limit: The maximum number of search result pages/items to parse.
+        harvester: The EmailHarvester instance to use for processing.
 
     Returns:
-        list[str]: A list of harvested email addresses.
+        A list of harvested email addresses.
     """
-    url = "http://www.ask.com/web?q=%40{word}&page={page}"
-    search = AskSearch(url, domain, limit)
-    search.process()
-    return search.get_emails()
+    # Ask uses page numbers (1, 2, 3...) instead of result offsets
+    url = "http://www.ask.com/web?q=%40{word}&page={counter}"
+    harvester.init_search(url, domain, limit, 1, 1, "Ask")
+    harvester.process()
+    return list(harvester.get_emails())
 
 
 class Plugin:
-    def __init__(self, app: Any, conf: dict[str, Any]) -> None:
-        global app_emailharvester, config
-        config = conf
+    """Plugin bridge for the Ask.com search engine."""
+
+    def __init__(self, app: Any, _conf: dict[str, Any]) -> None:
+        """Initializes the plugin and registers its search method.
+
+        Args:
+            app: The parent EmailHarvester orchestrator to register with.
+            _conf: Configuration dictionary containing User-Agent and proxy settings.
+        """
         app.register_plugin("ask", {"search": search})
-        app_emailharvester = app

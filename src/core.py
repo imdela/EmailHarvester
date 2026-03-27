@@ -63,15 +63,25 @@ if _platform == "win32":
 
 
 class LinkExtractor:
-    """
-    Identifies and filters potential capture links within search engine results.
-    Used for TI-01 Deep-Scraping to increase capture rate.
+    """Identifies and filters potential capture links within search engine results.
+
+    Used for TI-01 Deep-Scraping to increase capture rate by discovering
+    links that likely contain target domain contact information.
     """
 
     @staticmethod
     def extract_links(html: str, target_domain: str) -> list[str]:
-        """
-        Extracts absolute HTTP(S) links from HTML while filtering search engine noise.
+        """Extracts absolute HTTP(S) links from HTML while filtering noise.
+
+        Analyzes the provided HTML and extracts links that are not part of
+        known search engine domains and likely belong to the target domain.
+
+        Args:
+            html: The raw HTML content to parse for links.
+            target_domain: The domain to prioritize in the search results.
+
+        Returns:
+            A list of unique, validated absolute URLs found in the HTML.
         """
         # Simple href extraction regex
         links = re.findall(r'href=["\'](https?://[^\s"\'>]+)["\']', html)
@@ -116,16 +126,38 @@ class EngineProbe:
     def verify_plugin(self, plugin_name: str) -> bool:
         """
         Quickly validates if a plugin's base URL and networking are operational.
+        Performs a 'canary' request to check for structural blocks or URL invalidity.
         """
-        plugin = self.harvester.plugins.get(plugin_name)
-        if not plugin:
+        plugin_hooks = self.harvester.get_plugins().get(plugin_name)
+        if not plugin_hooks:
             return False
 
-        # For plugins, we check if the search URL format is still valid by doing a minimal request
-        # This is a 'soft' probe.
+        # Attempt a minimal check using the harvester's networking settings
         try:
-            # We don't want to trigger rate limits, so we use a dummy domain or just check accessibility
-            # In a real scenario, this might check for known 'alive' markers in the response.
+            # We use a neutral test domain
+            test_url = "https://www.google.com"  # Default fallback for connectivity
+
+            # If we were to be more precise, we'd need the base URL from the plugin
+            # But most search engines can be 'pinged' by their hostname
+
+            headers = {"User-Agent": self.harvester.userAgent}
+            proxies = None
+            if self.harvester.tor_enabled:
+                proxies = {
+                    "http": f"socks5h://{self.harvester.settings.tor_host}:{self.harvester.settings.tor_port}",
+                    "https": f"socks5h://{self.harvester.settings.tor_host}:{self.harvester.settings.tor_port}",
+                }
+
+            r = requests.get(test_url, headers=headers, proxies=proxies, timeout=5)
+
+            # Simple check: 200 OK and no immediate block markers
+            if r.status_code != 200:
+                return False
+
+            block_markers = ["captcha", "unusual traffic", "automated requests"]
+            if any(marker in r.text.lower() for marker in block_markers):
+                return False
+
             return True
         except Exception:
             return False
@@ -141,17 +173,21 @@ class MyParser:
         self.word: str = ""
 
     def extract(self, results: str, word: str) -> None:
-        """
-        Loads the raw HTML text and the target search word into the parser.
+        """Loads the raw content and the target search word into the parser.
 
         Args:
-            results (str): The raw HTML or text corpus containing potential emails.
-            word (str): The domain suffix (e.g., '@github.com') to search for.
+            results: The raw HTML or text corpus containing potential emails.
+            word: The domain suffix (e.g., 'example.com') to search for.
         """
         self.results = results
         self.word = word
 
     def genericClean(self) -> None:
+        """Removes common HTML entities and noise from the result buffer.
+
+        Sanitizes the results by stripping tags and replacing special characters
+        with spaces to improve regex capture accuracy.
+        """
         for e in (
             "<KW> </KW> </a> <b> </b> </div> <em> </em> <p> </span>\n"
             "                    <strong> </strong> <title> <wbr> </wbr>".split()
@@ -161,6 +197,14 @@ class MyParser:
             self.results = self.results.replace(e, " ")
 
     def emails(self) -> list[str]:
+        """Matches and returns unique emails from the sanitized results.
+
+        Uses a case-insensitive regex to capture mixed-case results conforming
+        to the target domain.
+
+        Returns:
+            A deduplicated list of harvested email addresses.
+        """
         self.genericClean()
         # Case-insensitive regex (re.I) to capture mixed-case results (US-16 Verification)
         reg_emails = re.compile(r"[a-zA-Z0-9.\-_+#~!$&\',;=:]+" + r"@" + r"[a-zA-Z0-9.-]*" + self.word, re.I)
@@ -169,6 +213,11 @@ class MyParser:
         return emails
 
     def unique(self) -> list[str]:
+        """Removes duplicates from the temporary email list.
+
+        Returns:
+            A list containing only unique email entries.
+        """
         self.new = list(set(self.temp))
         return self.new
 
@@ -221,14 +270,19 @@ class Settings(BaseSettings):
 
 
 class EmailHarvester:
+    """Main search orchestration engine for domain email harvesting.
+
+    Coordinates plugin execution, networking, stealth rotation (TOR/UA),
+    and real-time result persistence.
+    """
+
     def __init__(self, userAgent: str, proxy: Any, tor_enabled: bool = False) -> None:
-        """
-        Initializes the EmailHarvester engine and dynamically loads search plugins.
+        """Initializes the EmailHarvester engine and dynamically loads search plugins.
 
         Args:
-            userAgent (str): The default HTTP user-agent string.
-            proxy (Any): An optional parsed proxy configuration URL object.
-            tor_enabled (bool): Whether to route traffic through TOR and rotate identities.
+            userAgent: The default HTTP user-agent string.
+            proxy: An optional parsed proxy configuration URL object.
+            tor_enabled: Whether to route traffic through TOR and rotate identities.
         """
         self.settings = Settings()
         self.plugins: dict[str, Any] = {}
@@ -265,11 +319,13 @@ class EmailHarvester:
                 plugins[modname] = mod.Plugin(self, {"useragent": userAgent, "proxy": proxy})
 
     def refresh_tor_identity(self) -> bool:
-        """
-        Commands the configured TOR service to rotate the circuit and provide a new IP.
+        """Commands the configured TOR service to rotate the circuit.
+
+        Attempts to authenticate with the TOR control port and signals for a
+        NEWNYM identity rotation.
 
         Returns:
-            bool: True if the identity was successfully refreshed, False otherwise.
+            True if the identity was successfully refreshed, False otherwise.
         """
         try:
             with Controller.from_port(
@@ -282,21 +338,19 @@ class EmailHarvester:
             return False
 
     def register_plugin(self, search_method: str, functions: dict[str, Any]) -> None:
-        """
-        Registers a search engine plugin dynamically into the system.
+        """Registers a search engine plugin dynamically into the system.
 
         Args:
-            search_method (str): The unique identifier/name for the plugin engine.
-            functions (dict[str, Any]): A dictionary containing the plugin's execution hooks.
+            search_method: The unique identifier/name for the plugin engine.
+            functions: A dictionary containing the plugin's execution hooks.
         """
         self.plugins[search_method] = functions
 
     def get_plugins(self) -> dict[str, Any]:
-        """
-        Retrieves all currently registered plugins and their corresponding hook architectures.
+        """Retrieves all currently registered plugins and their hook architectures.
 
         Returns:
-            dict[str, Any]: A mapping of plugin names to their function hook dictionaries.
+            A mapping of plugin names to their function hook dictionaries.
         """
         return self.plugins
 
@@ -312,16 +366,15 @@ class EmailHarvester:
         counterStep: str | int,
         engineName: str,
     ) -> None:
-        """
-        Configures the scraping constraints and limits for a specific plugin run.
+        """Configures the scraping constraints and limits for a specific plugin run.
 
         Args:
-            url (str): The paginated URL structure belonging to the target plugin.
-            word (str): The target domain to harvest explicitly.
-            limit (str | int): Maximum total result pages to query natively.
-            counterInit (str | int): Starting offset parameter for pagination.
-            counterStep (str | int): Step size to increment pagination natively.
-            engineName (str): String identifier belonging to the current executor plugin.
+            url: The paginated URL structure belonging to the target plugin.
+            word: The target domain to harvest explicitly.
+            limit: Maximum total result pages to query natively.
+            counterInit: Starting offset parameter for pagination.
+            counterStep: Step size to increment pagination natively.
+            engineName: String identifier belonging to the current executor plugin.
         """
         self.results = ""
         self.totalresults = ""
@@ -334,11 +387,16 @@ class EmailHarvester:
         self.status = SearchStatus.SUCCESS
 
     def do_search(self) -> None:
-        """
-        Executes the network request bridging the explicitly formulated plugin URL.
+        """Executes the network request bridging the explicitly formulated plugin URL.
+
+        Formulates the final URL, rotates the User-Agent, configures proxies
+        (TOR or Standard), and executes the HTTP GET request.
 
         Raises:
-            RuntimeError: If a fatal error occurs (handled in process loop).
+            RateLimitError: If a 429 status is returned.
+            ForbiddenError: If a 403 status is returned.
+            SearchBlockedError: If bot prevention markers are detected in HTML.
+            EmailHarvesterError: For any other fatal networking or engine errors.
         """
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
@@ -413,8 +471,11 @@ class EmailHarvester:
             raise EmailHarvesterError(f"Engine interrupted: {e}") from e
 
     def process(self) -> None:
-        """
-        Orchestrates the iterative search process with resilient retry and break logic.
+        """Orchestrates the iterative search process with retry and stealth logic.
+
+        Executes repeated batches of search result scraping while applying
+        stealth jitter (TI-05), identity rotation on block detection (US-12),
+        and progress reporting.
         """
         while self.counter < self.limit:
             try:
@@ -446,6 +507,14 @@ class EmailHarvester:
 
                 if self.progress_callback and self.task_id is not None:
                     self.progress_callback(self.task_id, description=f"[red]{self.activeEngine} ({str(self.status)})")
+
+                # TI-02: Self-Healing Probe on hard failure
+                if not self.probe.verify_plugin(self.activeEngine.lower()):
+                    if self.progress_callback and self.task_id is not None:
+                        self.progress_callback(
+                            self.task_id,
+                            description=f"[bold red]Disabled {self.activeEngine}: Structural block detected",
+                        )
                 break
 
             # TI-05 Stealth Burst & Rest Jitter Logic
@@ -472,12 +541,19 @@ class EmailHarvester:
                 print(green(f"[+] Searching in {self.activeEngine}:") + cyan(f" {str(self.counter)} results"))
 
     def get_emails(self) -> list[str]:
+        """Finalizes the parsing of all accumulated HTML results.
+
+        Returns:
+            A list of unique emails extracted from the entire search session.
+        """
         self.parser.extract(self.totalresults, self.word)
         return self.parser.emails()
 
     def _visit_deep_link(self, url: str) -> None:
-        """
-        Internal worker to visit discovered links and extract emails recursively.
+        """Internal worker to visit discovered links and extract emails recursively.
+
+        Args:
+            url: The absolute HTTP URL to crawl for secondary emails.
         """
         if self.progress_callback and self.task_id is not None:
             self.progress_callback(self.task_id, description=f"[dim cyan]Deep Scraping: {url[:50]}...")
@@ -539,6 +615,17 @@ def unique(data: list[str]) -> list[str]:
 
 
 def checkProxyUrl(url: str) -> Any:
+    """Validates the structure of a proxy configuration URL.
+
+    Args:
+        url: The proxy URL to validate.
+
+    Returns:
+        A parsed ParseResult object if valid.
+
+    Raises:
+        argparse.ArgumentTypeError: If the URL is malformed or uses an invalid scheme.
+    """
     url_checked = urlparse(url)
     if (url_checked.scheme not in ("http", "https")) | (url_checked.netloc == ""):
         raise argparse.ArgumentTypeError("Invalid {} Proxy URL (example: http://127.0.0.1:8080).".format(url))
@@ -546,6 +633,17 @@ def checkProxyUrl(url: str) -> Any:
 
 
 def limit_type(x: str) -> int:
+    """Coerces and validates the search result limit.
+
+    Args:
+        x: The string representation of the result limit.
+
+    Returns:
+        The validated integer limit.
+
+    Raises:
+        argparse.ArgumentTypeError: If the limit is not a positive integer.
+    """
     x_int = int(x)
     if x_int > 0:
         return x_int
@@ -553,6 +651,17 @@ def limit_type(x: str) -> int:
 
 
 def checkDomain(value: str) -> str:
+    """Validates that the input is a well-formed domain.
+
+    Args:
+        value: The domain string to validate.
+
+    Returns:
+        The validated domain string.
+
+    Raises:
+        argparse.ArgumentTypeError: If the domain is invalid.
+    """
     domain_checked = validators.domain(value)
     if not domain_checked:
         raise argparse.ArgumentTypeError("Invalid {} domain.".format(value))

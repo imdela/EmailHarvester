@@ -37,23 +37,18 @@ def test_plugin_search_execution(mock_requests_get: MagicMock, plugin_name: str)
 
     # Some plugins might use a Plugin class that registers the function
     # Let's mock registration and direct call
+    try:
+        # Initializing Plugin handles registration logic
+        _plugin_instance = mod.Plugin(mock_app, {"useragent": "test-ua", "proxy": None})
 
-    with patch("src.plugins." + plugin_name + ".app_emailharvester", mock_app):
-        try:
-            # We need to handle the case where the plugin uses its own local app_emailharvester
-            # which is set during Plugin initialization.
-            _plugin_instance = mod.Plugin(mock_app, {"useragent": "test-ua", "proxy": None})
+        # Now call the search function using the new signature search(domain, limit, harvester)
+        emails = mod.search("example.com", 1, mock_app)
 
-            # Now call the search function
-            # Most plugins have a search(domain, limit) function
-            emails = mod.search("example.com", 1)
-
-            assert isinstance(emails, list)
-            if plugin_name != "ask":
-                mock_app.init_search.assert_called()
-                mock_app.process.assert_called()
-        except Exception as e:
-            pytest.fail(f"Plugin {plugin_name} failed: {e}")
+        assert isinstance(emails, list)
+        mock_app.init_search.assert_called()
+        mock_app.process.assert_called()
+    except Exception as e:
+        pytest.fail(f"Plugin {plugin_name} failed: {e}")
 
 
 @pytest.mark.parametrize("plugin_name", get_plugin_names())
