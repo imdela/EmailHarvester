@@ -21,29 +21,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 For more see the file 'LICENSE' for copying permission.
 """
 
-import requests
-import time
 import sys
+import time
+from typing import Any
+
+import requests
 from termcolor import colored
 
-config = None
-app_emailharvester = None
+config: Any = None
+app_emailharvester: Any = None
 
 
-def green(text):
+def green(text: str) -> str:
     return colored(text, "green", attrs=["bold"])
 
 
-def red(text):
+def red(text: str) -> str:
     return colored(text, "red", attrs=["bold"])
 
 
-def cyan(text):
+def cyan(text: str) -> str:
     return colored(text, "cyan", attrs=["bold"])
 
 
 class AskSearch(object):
-    def __init__(self, url, word, limit):
+    def __init__(self, url: str, word: str, limit: int | str) -> None:
         self.results = ""
         self.totalresults = ""
         self.limit = int(limit)
@@ -54,7 +56,7 @@ class AskSearch(object):
         self.userAgent = config["useragent"]
         self.counter = 0
 
-    def do_search(self):
+    def do_search(self) -> None:
         try:
             urly = self.url.format(page=str(self.page), word=self.word)
             headers = {"User-Agent": self.userAgent}
@@ -73,23 +75,20 @@ class AskSearch(object):
         self.results = r.content.decode(r.encoding)
         self.totalresults += self.results
 
-    def process(self):
+    def process(self) -> None:
         while self.counter < self.limit:
             self.do_search()
             time.sleep(1)
             self.counter += 10
             self.page += 1
-            print(
-                green("[+] Searching in ASK:")
-                + cyan(" {} results".format(str(self.counter)))
-            )
+            print(green("[+] Searching in ASK:") + cyan(" {} results".format(str(self.counter))))
 
-    def get_emails(self):
+    def get_emails(self) -> list[str]:
         app_emailharvester.parser.extract(self.totalresults, self.word)
-        return app_emailharvester.parser.emails()
+        return list(app_emailharvester.parser.emails())
 
 
-def search(domain, limit):
+def search(domain: str, limit: Any) -> list[str]:
     url = "http://www.ask.com/web?q=%40{word}&page={page}"
     search = AskSearch(url, domain, limit)
     search.process()
@@ -97,7 +96,7 @@ def search(domain, limit):
 
 
 class Plugin:
-    def __init__(self, app, conf):
+    def __init__(self, app: Any, conf: dict[str, Any]) -> None:
         global app_emailharvester, config
         config = conf
         app.register_plugin("ask", {"search": search})

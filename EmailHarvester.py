@@ -34,17 +34,18 @@ __maintainer__ = "maldevel"
 ################################
 
 import argparse
+import os
+import re
 import sys
 import time
-import requests
-import re
-import os
-import validators
-
-from termcolor import colored
 from argparse import RawTextHelpFormatter
 from sys import platform as _platform
+from typing import Any
 from urllib.parse import urlparse
+
+import requests
+import validators
+from termcolor import colored
 
 ################################
 
@@ -55,31 +56,33 @@ if _platform == "win32":
     colorama.init()
 
 
-class myparser:
-    def __init__(self):
-        self.temp = []
+class MyParser:
+    def __init__(self) -> None:
+        self.temp: list[str] = []
+        self.results: str = ""
+        self.word: str = ""
 
-    def extract(self, results, word):
+    def extract(self, results: str, word: str) -> None:
         self.results = results
         self.word = word
 
-    def genericClean(self):
-        for e in """<KW> </KW> </a> <b> </b> </div> <em> </em> <p> </span>
-                    <strong> </strong> <title> <wbr> </wbr>""".split():
+    def genericClean(self) -> None:
+        for e in (
+            "<KW> </KW> </a> <b> </b> </div> <em> </em> <p> </span>\n"
+            "                    <strong> </strong> <title> <wbr> </wbr>".split()
+        ):
             self.results = self.results.replace(e, "")
         for e in "%2f %3a %3A %3C %3D & / : ; < = > \\".split():
             self.results = self.results.replace(e, " ")
 
-    def emails(self):
+    def emails(self) -> list[str]:
         self.genericClean()
-        reg_emails = re.compile(
-            r"[a-zA-Z0-9.\-_+#~!$&\',;=:]+" + r"@" + r"[a-zA-Z0-9.-]*" + self.word
-        )
+        reg_emails = re.compile(r"[a-zA-Z0-9.\-_+#~!$&\',;=:]+" + r"@" + r"[a-zA-Z0-9.-]*" + self.word)
         self.temp = reg_emails.findall(self.results)
         emails = self.unique()
         return emails
 
-    def unique(self):
+    def unique(self) -> list[str]:
         self.new = list(set(self.temp))
         return self.new
 
@@ -87,35 +90,35 @@ class myparser:
 ###################################################################
 
 
-class EmailHarvester(object):
-    def __init__(self, userAgent, proxy):
-        self.plugins = {}
+class EmailHarvester:
+    def __init__(self, userAgent: str, proxy: Any) -> None:
+        self.plugins: dict[str, Any] = {}
         self.proxy = proxy
         self.userAgent = userAgent
-        self.parser = myparser()
+        self.parser = MyParser()
         self.activeEngine = "None"
         path = os.path.dirname(os.path.abspath(__file__)) + "/plugins/"
-        plugins = {}
+        plugins: dict[str, Any] = {}
 
         sys.path.insert(0, path)
         for f in os.listdir(path):
             fname, ext = os.path.splitext(f)
             if ext == ".py":
                 mod = __import__(fname, fromlist=[""])
-                plugins[fname] = mod.Plugin(
-                    self, {"useragent": userAgent, "proxy": proxy}
-                )
+                plugins[fname] = mod.Plugin(self, {"useragent": userAgent, "proxy": proxy})
 
-    def register_plugin(self, search_method, functions):
+    def register_plugin(self, search_method: str, functions: dict[str, Any]) -> None:
         self.plugins[search_method] = functions
 
-    def get_plugins(self):
+    def get_plugins(self) -> dict[str, Any]:
         return self.plugins
 
-    def show_message(self, msg):
+    def show_message(self, msg: str) -> None:
         print(green(msg))
 
-    def init_search(self, url, word, limit, counterInit, counterStep, engineName):
+    def init_search(
+        self, url: str, word: str, limit: str | int, counterInit: str | int, counterStep: str | int, engineName: str
+    ) -> None:
         self.results = ""
         self.totalresults = ""
         self.limit = int(limit)
@@ -125,7 +128,7 @@ class EmailHarvester(object):
         self.word = word
         self.activeEngine = engineName
 
-    def do_search(self):
+    def do_search(self) -> None:
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
             headers = {"User-Agent": self.userAgent}
@@ -145,17 +148,16 @@ class EmailHarvester(object):
         self.results = r.content.decode(r.encoding)
         self.totalresults += self.results
 
-    def process(self):
+    def process(self) -> None:
         while self.counter < self.limit:
             self.do_search()
             time.sleep(1)
             self.counter += self.step
             print(
-                green("[+] Searching in {}:".format(self.activeEngine))
-                + cyan(" {} results".format(str(self.counter)))
+                green("[+] Searching in {}:".format(self.activeEngine)) + cyan(" {} results".format(str(self.counter)))
             )
 
-    def get_emails(self):
+    def get_emails(self) -> list[str]:
         self.parser.extract(self.totalresults, self.word)
         return self.parser.emails()
 
@@ -163,46 +165,44 @@ class EmailHarvester(object):
 ###################################################################
 
 
-def yellow(text):
-    return colored(text, "yellow", attrs=["bold"])
+def yellow(text: str) -> str:
+    return str(colored(text, "yellow", attrs=["bold"]))
 
 
-def green(text):
-    return colored(text, "green", attrs=["bold"])
+def green(text: str) -> str:
+    return str(colored(text, "green", attrs=["bold"]))
 
 
-def red(text):
-    return colored(text, "red", attrs=["bold"])
+def red(text: str) -> str:
+    return str(colored(text, "red", attrs=["bold"]))
 
 
-def cyan(text):
-    return colored(text, "cyan", attrs=["bold"])
+def cyan(text: str) -> str:
+    return str(colored(text, "cyan", attrs=["bold"]))
 
 
-def unique(data):
+def unique(data: list[str]) -> list[str]:
     return list(set(data))
 
 
 ###################################################################
 
 
-def checkProxyUrl(url):
+def checkProxyUrl(url: str) -> Any:
     url_checked = urlparse(url)
     if (url_checked.scheme not in ("http", "https")) | (url_checked.netloc == ""):
-        raise argparse.ArgumentTypeError(
-            "Invalid {} Proxy URL (example: http://127.0.0.1:8080).".format(url)
-        )
+        raise argparse.ArgumentTypeError("Invalid {} Proxy URL (example: http://127.0.0.1:8080).".format(url))
     return url_checked
 
 
-def limit_type(x):
-    x = int(x)
-    if x > 0:
-        return x
+def limit_type(x: str) -> int:
+    x_int = int(x)
+    if x_int > 0:
+        return x_int
     raise argparse.ArgumentTypeError("Minimum results limit is 1.")
 
 
-def checkDomain(value):
+def checkDomain(value: str) -> str:
     domain_checked = validators.domain(value)
     if not domain_checked:
         raise argparse.ArgumentTypeError("Invalid {} domain.".format(value))
@@ -335,18 +335,12 @@ if __name__ == "__main__":
         sys.exit(2)
     domain = args.domain
 
-    userAgent = (
-        args.uagent
-        or "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1"
-    )
+    userAgent = args.uagent or "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1"
 
     print(green("[+] User-Agent in use: ") + cyan(userAgent))
 
     if args.proxy:
-        print(
-            green("[+] Proxy server in use: ")
-            + cyan(args.proxy.scheme + "://" + args.proxy.netloc)
-        )
+        print(green("[+] Proxy server in use: ") + cyan(args.proxy.scheme + "://" + args.proxy.netloc))
 
     filename = args.filename or ""
     limit = args.limit
@@ -376,7 +370,7 @@ if __name__ == "__main__":
         print(red("[-] No emails found"))
         sys.exit(4)
 
-    print(green("[+] Emails found: ") + cyan(len(all_emails)))
+    print(green("[+] Emails found: ") + cyan(str(len(all_emails))))
 
     if not args.noprint:
         for emails in all_emails:
@@ -390,9 +384,7 @@ if __name__ == "__main__":
                     try:
                         out_file.write(email + "\n")
                     except Exception as email_err:
-                        print(
-                            red("[-] Exception writing {}: {}".format(email, email_err))
-                        )
+                        print(red("[-] Exception writing {}: {}".format(email, email_err)))
         except Exception as e:
             print(red("[-] Error saving TXT file: " + str(e)))
 
