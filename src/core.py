@@ -237,7 +237,7 @@ class EmailHarvester:
 
             if r.encoding is None:
                 r.encoding = "UTF-8"
-            self.results = r.content.decode(r.encoding)
+            self.results = r.content.decode(r.encoding, errors="replace")
 
             block_markers = ["captcha", "unusual traffic", "automated requests", "g-recaptcha"]
             if any(marker in self.results.lower() for marker in block_markers):
