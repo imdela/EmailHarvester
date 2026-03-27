@@ -64,6 +64,7 @@ def run_engine_thread(
     tor: bool,
     progress: Any,
     save_callback: Any = None,
+    deep_scraping: bool = False,
 ) -> tuple[list[str], str]:
     """
     Worker function to execute a single search engine sequentially within a thread.
@@ -84,6 +85,7 @@ def run_engine_thread(
     # Create thread-local EmailHarvester instance to isolate instance state
     thread_app = EmailHarvester(userAgent, proxy, tor_enabled=tor)
     thread_app.save_callback = save_callback
+    thread_app.deep_scraping = deep_scraping
 
     task_id = progress.add_task(f"[cyan]Searching in {search_engine}...", total=limit)
     thread_app.progress_callback = progress.update
@@ -208,6 +210,13 @@ def main() -> None:
         default=False,
         help="List all available plugins.",
     )
+    parser.add_argument(
+        "--deep",
+        action="store_true",
+        dest="deep",
+        default=False,
+        help="Enable deep-scraping: visit discovered links recursively to find more emails (TI-01).",
+    )
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -301,6 +310,7 @@ def main() -> None:
                     args.tor,
                     progress,
                     save_email_callback,
+                    args.deep,
                 ): engine_name
                 for engine_name in engines_to_run
             }
