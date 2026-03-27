@@ -91,7 +91,8 @@ class MyParser:
 
     def emails(self) -> list[str]:
         self.genericClean()
-        reg_emails = re.compile(r"[a-zA-Z0-9.\-_+#~!$&\',;=:]+" + r"@" + r"[a-zA-Z0-9.-]*" + self.word)
+        # Case-insensitive regex (re.I) to capture mixed-case results (US-16 Verification)
+        reg_emails = re.compile(r"[a-zA-Z0-9.\-_+#~!$&\',;=:]+" + r"@" + r"[a-zA-Z0-9.-]*" + self.word, re.I)
         self.temp = reg_emails.findall(self.results)
         emails = self.unique()
         return emails
@@ -141,6 +142,8 @@ class EmailHarvester:
         self.task_id: Any = None
         self.status = SearchStatus.SUCCESS
         self.retry_count = 0
+        self.results = ""
+        self.totalresults = ""
         plugins: dict[str, Any] = {}
         import src.plugins
 
