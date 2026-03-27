@@ -17,5 +17,5 @@ This checklist tracks the remediation steps required to close the gaps identifie
 - [x] **Fix TI-07 (Plugin Layer Docstrings)**:
   - Enforce PEP 257 Google-Style compliance by adding complete `Args:` and `Returns:` docstrings to the `search()` function of ALL remaining plugin files (ask, baidu, bing, dogpile, github, google, instagram, reddit, twitter, yahoo, youtube).
 
-- [ ] **Fix TI-08 (True Pytest Refactoring)**:
+- [x] **Fix TI-08 (True Pytest Refactoring)**:
   - Refactor the existing test suites (`test_stealth.py`, `test_resilience.py`) to actually utilize the specific `base_harvester` fixture defined in `conftest.py`, eliminating the manual instantiation of `EmailHarvester` instances in every test class.

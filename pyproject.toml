@@ -12,3 +12,10 @@ strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 ignore_missing_imports = true # for external un-typed packages like requests
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: Pure unit tests parsing mock text locally",
+    "functional: Mock testing logic and loops",
+    "integration: Actual infrastructure validation communicating via local networking like Docker",
+]
