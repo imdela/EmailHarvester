@@ -24,6 +24,7 @@ For more see the file 'LICENSE' for copying permission.
 import argparse
 import sys
 import threading
+import time
 from argparse import RawTextHelpFormatter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -305,8 +306,9 @@ def main() -> None:
         # Limit concurrency to 20 threads to ensure "Network Stealth" and avoid ISP-level flagging
         max_concurrency = min(len(engines_to_run), 20)
         with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
-            future_to_engine = {
-                executor.submit(
+            future_to_engine = {}
+            for engine_name in engines_to_run:
+                future = executor.submit(
                     run_engine_thread,
                     engine_name,
                     domain,
@@ -317,9 +319,14 @@ def main() -> None:
                     progress,
                     save_email_callback,
                     args.deep,
-                ): engine_name
-                for engine_name in engines_to_run
-            }
+                )
+                future_to_engine[future] = engine_name
+
+                # Staggered Start (TI-11): Avoid burst detection (Human-like behavior)
+                if len(engines_to_run) > 1:
+                    import random
+
+                    time.sleep(random.uniform(0.2, 0.5))
 
             for future in as_completed(future_to_engine):
                 engine_name = future_to_engine[future]

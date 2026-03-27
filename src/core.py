@@ -37,7 +37,6 @@ import argparse
 import importlib
 import os
 import pkgutil
-import random
 import re
 import time
 from enum import StrEnum
@@ -51,9 +50,9 @@ import yaml
 from fake_useragent import UserAgent
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from stem import Signal
-from stem.control import Controller
 from termcolor import colored
+
+import src.resilience as resilience
 
 ################################
 
@@ -288,6 +287,14 @@ class EmailHarvester:
         """
         self.settings = Settings()
         self.plugin_configs: dict[str, Any] = self._load_engines_config()
+        self.resilience = resilience.ResilienceManager(
+            storage_path=os.path.join(os.path.dirname(__file__), "config", "ip_health.csv"),
+            tor_enabled=tor_enabled,
+            tor_host=self.settings.tor_host,
+            tor_port=self.settings.tor_port,
+            tor_control_port=self.settings.tor_control_port,
+            tor_password=self.settings.tor_control_password,
+        )
         self.plugins: dict[str, Any] = {}
         self.proxy = proxy
         self.tor_enabled = tor_enabled
@@ -308,8 +315,6 @@ class EmailHarvester:
         self.retry_count = 0
         self.results = ""
         self.totalresults = ""
-        self.burst_count = 0
-        self.burst_limit = 5
         self.deep_scraping = False  # TI-01 Deep Scraping Toggle
         self.visited_links: set[str] = set()
         self.probe = EngineProbe(self)  # TI-02 Self-Healing Probe
@@ -354,25 +359,6 @@ class EmailHarvester:
             return []
         sources = plugin_data.get("sources", [])
         return sources if isinstance(sources, list) else []
-
-    def refresh_tor_identity(self) -> bool:
-        """Commands the configured TOR service to rotate the circuit.
-
-        Attempts to authenticate with the TOR control port and signals for a
-        NEWNYM identity rotation.
-
-        Returns:
-            True if the identity was successfully refreshed, False otherwise.
-        """
-        try:
-            with Controller.from_port(
-                address=self.settings.tor_host, port=self.settings.tor_control_port
-            ) as controller:
-                controller.authenticate(password=self.settings.tor_control_password)
-                controller.signal(Signal.NEWNYM)
-                return True
-        except Exception:
-            return False
 
     def register_plugin(self, search_method: str, functions: dict[str, Any]) -> None:
         """Registers a search engine plugin dynamically into the system.
@@ -435,6 +421,7 @@ class EmailHarvester:
             SearchBlockedError: If bot prevention markers are detected in HTML.
             EmailHarvesterError: For any other fatal networking or engine errors.
         """
+        current_ip = "unknown"
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
 
@@ -446,7 +433,9 @@ class EmailHarvester:
 
             headers = {"User-Agent": self.userAgent}
 
-            # Config SOCKS5 if TOR is enabled (US-12)
+            # TI-11 Resilience Pre-flight
+            current_ip = self.resilience.pre_flight_check()
+
             proxies = None
             if self.tor_enabled:
                 proxies = {
@@ -459,9 +448,11 @@ class EmailHarvester:
             r = requests.get(urly, headers=headers, proxies=proxies, timeout=self.settings.timeout)
 
             if r.status_code == 429:
+                self.resilience.report_block(current_ip, reason="429 Rate Limit", permanent=False)
                 self.status = SearchStatus.FAILED_RATE_LIMIT
                 raise RateLimitError("429 Rate Limit")
             if r.status_code == 403:
+                self.resilience.report_block(current_ip, reason="403 Forbidden", permanent=True)
                 self.status = SearchStatus.FAILED_FORBIDDEN
                 raise ForbiddenError("403 Forbidden")
             r.raise_for_status()
@@ -472,6 +463,7 @@ class EmailHarvester:
 
             block_markers = ["captcha", "unusual traffic", "automated requests", "g-recaptcha"]
             if any(marker in self.results.lower() for marker in block_markers):
+                self.resilience.report_block(current_ip, reason="Bot Challenge", permanent=False)
                 self.status = SearchStatus.PARTIAL_CAPTCHA
                 raise SearchBlockedError("Bot challenge detected")
 
@@ -506,6 +498,9 @@ class EmailHarvester:
             if self.status == SearchStatus.SUCCESS:
                 self.status = SearchStatus.PARTIAL_BLOCKED
             raise EmailHarvesterError(f"Engine interrupted: {e}") from e
+        finally:
+            if current_ip != "unknown":
+                self.resilience.release_ip(current_ip)
 
     def process(self) -> None:
         """Orchestrates the iterative search process with retry and stealth logic.
@@ -518,7 +513,7 @@ class EmailHarvester:
             try:
                 self.do_search()
                 self.retry_count = 0  # Reset on success
-                self.burst_count += 1
+
             except EmailHarvesterError:
                 # TOR Identity Refresh on failure (US-12)
                 if (
@@ -531,7 +526,7 @@ class EmailHarvester:
                             self.task_id, description=f"[yellow]Rotating TOR IP for {self.activeEngine}..."
                         )
 
-                    if self.refresh_tor_identity():
+                    if self.resilience.rotate_identity():
                         self.retry_count += 1
                         time.sleep(5.0)  # Wait for circuit renewal
                         continue  # Retry same batch with new IP
@@ -553,21 +548,6 @@ class EmailHarvester:
                             description=f"[bold red]Disabled {self.activeEngine}: Structural block detected",
                         )
                 break
-
-            # TI-05 Stealth Burst & Rest Jitter Logic
-            if self.burst_count >= self.burst_limit:
-                rest_time = random.uniform(15.0, 30.0)
-                if self.progress_callback and self.task_id is not None:
-                    self.progress_callback(
-                        self.task_id, description=f"[yellow]Resting for {rest_time:.1f}s ({self.activeEngine})..."
-                    )
-                else:
-                    print(yellow(f"[~] Resting {self.activeEngine} for {rest_time:.1f}s to evade detection..."))
-
-                time.sleep(rest_time)
-                self.burst_count = 0
-            else:
-                time.sleep(random.uniform(0.7, 1.8))
 
             self.counter += self.step
             if self.progress_callback and self.task_id is not None:

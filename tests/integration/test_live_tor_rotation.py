@@ -18,7 +18,7 @@ def test_live_tor_rotation_changes_ip() -> None:
 
     # Pre-flight check: if TOR control is not accessible, skip the test gracefully (no compose running)
     try:
-        if not app.refresh_tor_identity():
+        if not app.resilience.rotate_identity():
             pytest.skip(
                 "TOR container is not active or refused auth. Run 'docker compose up -d' first to test live infrastructure."
             )
@@ -37,7 +37,7 @@ def test_live_tor_rotation_changes_ip() -> None:
         ip1 = r1.text.strip()
 
         # Ordonnate a strict rotation
-        success = app.refresh_tor_identity()
+        success = app.resilience.rotate_identity()
         assert success is True, "Failed to execute NEWNYM signal against Tor Control."
 
         # Give Tor sufficient time to tear down and rebuild a new proxy circuit

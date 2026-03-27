@@ -1,0 +1,18 @@
+# Stealth and Resilience Configuration
+# Allows adjusting human simulation parameters without modifying code.
+
+timing:
+  min_jitter_ms: 100
+  max_jitter_ms: 500
+  start_progressive_delay_s: 3
+  progressive_delay_step_s: 2
+  progressive_delay_cap_s: 30
+
+burst:
+  threshold_requests: 6 # Number of cumulative requests before a burst rest
+  pause_duration_s: 5 # Human-like pause duration
+
+resilience:
+  quarantine_duration_min: 60
+  rotation_stabilization_s: 15
+  max_attempts_before_blacklist: 5
