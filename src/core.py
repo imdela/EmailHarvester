@@ -47,6 +47,8 @@ from urllib.parse import urlparse
 import requests
 import validators
 from fake_useragent import UserAgent
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from stem import Signal
 from stem.control import Controller
 from termcolor import colored
@@ -114,6 +116,19 @@ class SearchStatus(StrEnum):
     FAILED_RATE_LIMIT = "FAILED_RATE_LIMIT"
 
 
+class Settings(BaseSettings):
+    """
+    Validates and centralizes initial environment configurations for EmailHarvester.
+    """
+
+    user_agent_platform: str = Field(default="desktop", description="Platform for fake-useragent")
+    tor_port: int = Field(default=9050, description="Local TOR SOCKS5 port")
+    tor_control_port: int = Field(default=9051, description="Local TOR Control port")
+    timeout: int = Field(default=12, description="HTTP request timeout in seconds", gt=0)
+
+    model_config = SettingsConfigDict(env_prefix="EH_")
+
+
 class EmailHarvester:
     def __init__(self, userAgent: str, proxy: Any, tor_enabled: bool = False) -> None:
         """
@@ -124,11 +139,12 @@ class EmailHarvester:
             proxy (Any): An optional parsed proxy configuration URL object.
             tor_enabled (bool): Whether to route traffic through TOR and rotate identities.
         """
+        self.settings = Settings()
         self.plugins: dict[str, Any] = {}
         self.proxy = proxy
         self.tor_enabled = tor_enabled
         self.default_userAgent = userAgent
-        self.userAgent_rotator = UserAgent(platforms="desktop")
+        self.userAgent_rotator = UserAgent(platforms=self.settings.user_agent_platform)
         # Initialize current UA from pool if possible, fallback to default
         try:
             self.userAgent = self.userAgent_rotator.random
@@ -157,7 +173,7 @@ class EmailHarvester:
         Commands the local TOR service to rotate the circuit and provide a new IP. (US-12)
         """
         try:
-            with Controller.from_port(port=9051) as controller:
+            with Controller.from_port(port=self.settings.tor_control_port) as controller:
                 controller.authenticate()  # Requires password if set, or just cookie
                 controller.signal(Signal.NEWNYM)
                 return True
@@ -224,11 +240,14 @@ class EmailHarvester:
             # Config SOCKS5 if TOR is enabled (US-12)
             proxies = None
             if self.tor_enabled:
-                proxies = {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}
+                proxies = {
+                    "http": f"socks5h://127.0.0.1:{self.settings.tor_port}",
+                    "https": f"socks5h://127.0.0.1:{self.settings.tor_port}",
+                }
             elif self.proxy:
                 proxies = {self.proxy.scheme: "http://" + self.proxy.netloc}
 
-            r = requests.get(urly, headers=headers, proxies=proxies, timeout=12)
+            r = requests.get(urly, headers=headers, proxies=proxies, timeout=self.settings.timeout)
 
             if r.status_code == 429:
                 self.status = SearchStatus.FAILED_RATE_LIMIT
