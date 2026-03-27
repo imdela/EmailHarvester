@@ -1,6 +1,40 @@
+"""
+This file is part of EmailHarvester
+Copyright (C) 2016 @maldevel
+https://github.com/maldevel/EmailHarvester
+
+EmailHarvester - A tool to retrieve Domain email addresses from Search Engines.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+For more see the file 'LICENSE' for copying permission.
+"""
+
 import argparse
 import sys
 from argparse import RawTextHelpFormatter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
+
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 
 from src.core import (
     EmailHarvester,
@@ -16,8 +50,34 @@ from src.core import (
 )
 
 
-def main() -> None:
+def run_engine_thread(
+    search_engine: str,
+    domain: str,
+    limit: int,
+    userAgent: str,
+    proxy: Any,
+    progress: Any,
+) -> list[str]:
+    """
+    Worker function to execute a single search engine sequentially within a thread.
+    """
+    # Create thread-local EmailHarvester instance to isolate instance state
+    thread_app = EmailHarvester(userAgent, proxy)
 
+    # Setup progress bar
+    task_id = progress.add_task(f"[cyan]Searching in {search_engine}...", total=limit)
+    thread_app.progress_callback = progress.update
+    thread_app.task_id = task_id
+
+    # Execute the specific engine search
+    emails = thread_app.get_plugins()[search_engine]["search"](domain, limit)
+
+    # Complete task
+    progress.update(task_id, completed=limit)
+    return list(emails)
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=r"""
 
@@ -168,9 +228,44 @@ def main() -> None:
                 print(red("[-] Search engine plugin not found: " + e))
                 sys.exit(3)
 
-    for search_engine in engines_to_run:
-        all_emails += plugins[search_engine]["search"](domain, limit)
-    all_emails = unique(all_emails)
+    final_emails = []
+    failed_engines = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+    ) as progress:
+        # Limit concurrency to 20 threads to ensure "Network Stealth" and avoid ISP-level flagging
+        max_concurrency = min(len(engines_to_run), 20)
+        with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
+            future_to_engine = {
+                executor.submit(
+                    run_engine_thread,
+                    engine_name,
+                    domain,
+                    limit,
+                    userAgent,
+                    args.proxy,
+                    progress,
+                ): engine_name
+                for engine_name in engines_to_run
+            }
+
+            for future in as_completed(future_to_engine):
+                engine_name = future_to_engine[future]
+                try:
+                    final_emails.extend(future.result())
+                except Exception as e:
+                    progress.console.print(red(f"[-] Error in engine '{engine_name}': {e}"))
+                    failed_engines.append(engine_name)
+
+    all_emails = unique(final_emails)
+
+    if failed_engines:
+        print(red(f"[-] The following engines failed: {', '.join(failed_engines)}"))
 
     if not all_emails:
         print(red("[-] No emails found"))

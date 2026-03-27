@@ -36,8 +36,8 @@ __maintainer__ = "maldevel"
 import argparse
 import importlib
 import pkgutil
+import random
 import re
-import sys
 import time
 from sys import platform as _platform
 from typing import Any
@@ -114,6 +114,8 @@ class EmailHarvester:
         self.userAgent = userAgent
         self.parser = MyParser()
         self.activeEngine = "None"
+        self.progress_callback: Any = None
+        self.task_id: Any = None
         plugins: dict[str, Any] = {}
         import src.plugins
 
@@ -171,8 +173,7 @@ class EmailHarvester:
                 r = requests.get(urly, headers=headers)
 
         except Exception as e:
-            print(e)
-            sys.exit(4)
+            raise RuntimeError(f"Network error in {self.activeEngine}: {e}") from e
 
         if r.encoding is None:
             r.encoding = "UTF-8"
@@ -183,11 +184,15 @@ class EmailHarvester:
     def process(self) -> None:
         while self.counter < self.limit:
             self.do_search()
-            time.sleep(1)
+            time.sleep(random.uniform(0.7, 1.8))
             self.counter += self.step
-            print(
-                green("[+] Searching in {}:".format(self.activeEngine)) + cyan(" {} results".format(str(self.counter)))
-            )
+            if self.progress_callback and self.task_id is not None:
+                self.progress_callback(self.task_id, advance=self.step)
+            else:
+                print(
+                    green("[+] Searching in {}:".format(self.activeEngine))
+                    + cyan(" {} results".format(str(self.counter)))
+                )
 
     def get_emails(self) -> list[str]:
         self.parser.extract(self.totalresults, self.word)

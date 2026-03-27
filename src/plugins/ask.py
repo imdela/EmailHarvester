@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 For more see the file 'LICENSE' for copying permission.
 """
 
-import sys
 import time
 from typing import Any
 
@@ -69,8 +68,7 @@ class AskSearch(object):
                 r = requests.get(urly, headers=headers)
 
         except Exception as e:
-            print(e)
-            sys.exit(4)
+            raise RuntimeError(f"Network error in ASK: {e}") from e
 
         if r.encoding is None:
             r.encoding = "UTF-8"
