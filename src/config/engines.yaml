@@ -8,6 +8,12 @@ plugins:
         url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q="%40{word}"'
         counter_init: 0
         counter_step: 100
+  duckduckgo:
+    sources:
+      - name: "DuckDuckGo (Lite)"
+        url: "https://lite.duckduckgo.com/lite/?q=%40{word}&s={counter}"
+        counter_init: 0
+        counter_step: 30
   ask:
     sources:
       - name: "Ask"
