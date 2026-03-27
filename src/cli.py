@@ -23,6 +23,7 @@ For more see the file 'LICENSE' for copying permission.
 
 import argparse
 import sys
+import threading
 from argparse import RawTextHelpFormatter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -56,13 +57,16 @@ def run_engine_thread(
     limit: int,
     userAgent: str,
     proxy: Any,
+    tor: bool,
     progress: Any,
+    save_callback: Any = None,
 ) -> tuple[list[str], str]:
     """
     Worker function to execute a single search engine sequentially within a thread.
     """
     # Create thread-local EmailHarvester instance to isolate instance state
-    thread_app = EmailHarvester(userAgent, proxy)
+    thread_app = EmailHarvester(userAgent, proxy, tor_enabled=tor)
+    thread_app.save_callback = save_callback
 
     task_id = progress.add_task(f"[cyan]Searching in {search_engine}...", total=limit)
     thread_app.progress_callback = progress.update
@@ -153,6 +157,13 @@ def main() -> None:
         help="Setup proxy server (eg. '-x http://127.0.0.1:8080')",
     )
     parser.add_argument(
+        "--tor",
+        action="store_true",
+        dest="tor",
+        default=False,
+        help="Enable TOR proxy (127.0.0.1:9050) and automatic identity rotation on blocks.",
+    )
+    parser.add_argument(
         "--noprint",
         action="store_true",
         default=False,
@@ -204,16 +215,34 @@ def main() -> None:
 
     if args.proxy:
         print(green("[+] Proxy server in use: ") + cyan(args.proxy.scheme + "://" + args.proxy.netloc))
+    if args.tor:
+        print(green("[+] TOR proxy enabled (127.0.0.1:9050)"))
 
     filename = args.filename or ""
     limit = args.limit
     engine = args.engine
-    app = EmailHarvester(userAgent, args.proxy)
-    plugins = app.get_plugins()
+
+    # Persistent Writing State (US-13)
+    file_lock = threading.Lock()
+    global_emails: set[str] = set()  # Keep track of emails already written to file
+
+    def save_email_callback(new_emails: list[str]) -> None:
+        if not filename:
+            return
+
+        with file_lock:
+            with open(f"{filename}.txt", "a") as f:
+                for email in new_emails:
+                    if email not in global_emails:
+                        f.write(email + "\n")
+                        global_emails.add(email)
+            # Ensure real-time flush
+            # f.flush() and closing handles this in the context manager
 
     all_emails = []
     excluded = args.exclude.split(",") if args.exclude else []
 
+    plugins = EmailHarvester(userAgent, args.proxy, tor_enabled=args.tor).get_plugins()
     engines_to_run = []
     if engine == "all":
         print(green("[+] Searching everywhere"))
@@ -221,13 +250,14 @@ def main() -> None:
     else:
         engines_to_run = [e.strip() for e in engine.split(",")]
         for e in engines_to_run:
+            # Check against original loaded plugins keys
             if e not in plugins:
                 print(red("[-] Search engine plugin not found: " + e))
                 sys.exit(3)
 
     final_emails = []
-    failed_engines = []
     engine_stats: list[tuple[str, int, str]] = []
+    failed_engines: list[str] = []
 
     with Progress(
         SpinnerColumn(),
@@ -247,7 +277,9 @@ def main() -> None:
                     limit,
                     userAgent,
                     args.proxy,
+                    args.tor,
                     progress,
+                    save_email_callback,
                 ): engine_name
                 for engine_name in engines_to_run
             }
@@ -265,6 +297,7 @@ def main() -> None:
 
     all_emails = unique(final_emails)
 
+    # 1. Diagnostic Report Header
     print(green("\n[+] Search Engine Diagnostics:"))
     for engine_name, count, status in sorted(engine_stats):
         symbol = green("[+]") if status == "SUCCESS" else yellow("[?]") if "PARTIAL" in status else red("[X]")
@@ -279,6 +312,8 @@ def main() -> None:
         sys.exit(4)
 
     print(green("\n[+] Total unique emails found: ") + cyan(str(len(all_emails))))
+    if filename:
+        print(green("[+] Total unique emails saved to: ") + cyan(f"{filename}.txt"))
 
     if not args.noprint:
         for emails in all_emails:

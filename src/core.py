@@ -46,6 +46,9 @@ from urllib.parse import urlparse
 
 import requests
 import validators
+from fake_useragent import UserAgent
+from stem import Signal
+from stem.control import Controller
 from termcolor import colored
 
 ################################
@@ -111,20 +114,30 @@ class SearchStatus(StrEnum):
 
 
 class EmailHarvester:
-    def __init__(self, userAgent: str, proxy: Any) -> None:
+    def __init__(self, userAgent: str, proxy: Any, tor_enabled: bool = False) -> None:
         """
         Initializes the EmailHarvester engine and dynamically loads search plugins.
 
         Args:
-            userAgent (str): The HTTP user-agent string used for native web requests.
+            userAgent (str): The default HTTP user-agent string.
             proxy (Any): An optional parsed proxy configuration URL object.
+            tor_enabled (bool): Whether to route traffic through TOR and rotate identities.
         """
         self.plugins: dict[str, Any] = {}
         self.proxy = proxy
-        self.userAgent = userAgent
+        self.tor_enabled = tor_enabled
+        self.default_userAgent = userAgent
+        self.userAgent_rotator = UserAgent(platforms="desktop")
+        # Initialize current UA from pool if possible, fallback to default
+        try:
+            self.userAgent = self.userAgent_rotator.random
+        except Exception:
+            self.userAgent = userAgent
+
         self.parser = MyParser()
         self.activeEngine = "None"
         self.progress_callback: Any = None
+        self.save_callback: Any = None  # US-13 Stream-to-Disk hook
         self.task_id: Any = None
         self.status = SearchStatus.SUCCESS
         self.retry_count = 0
@@ -135,6 +148,18 @@ class EmailHarvester:
             mod = importlib.import_module(f"src.plugins.{modname}")
             if hasattr(mod, "Plugin"):
                 plugins[modname] = mod.Plugin(self, {"useragent": userAgent, "proxy": proxy})
+
+    def refresh_tor_identity(self) -> bool:
+        """
+        Commands the local TOR service to rotate the circuit and provide a new IP. (US-12)
+        """
+        try:
+            with Controller.from_port(port=9051) as controller:
+                controller.authenticate()  # Requires password if set, or just cookie
+                controller.signal(Signal.NEWNYM)
+                return True
+        except Exception:
+            return False
 
     def register_plugin(self, search_method: str, functions: dict[str, Any]) -> None:
         self.plugins[search_method] = functions
@@ -184,12 +209,23 @@ class EmailHarvester:
         """
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
+
+            # Rotate User-Agent for every batch request (US-12)
+            try:
+                self.userAgent = self.userAgent_rotator.random
+            except Exception:
+                pass
+
             headers = {"User-Agent": self.userAgent}
-            if self.proxy:
+
+            # Config SOCKS5 if TOR is enabled (US-12)
+            proxies = None
+            if self.tor_enabled:
+                proxies = {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}
+            elif self.proxy:
                 proxies = {self.proxy.scheme: "http://" + self.proxy.netloc}
-                r = requests.get(urly, headers=headers, proxies=proxies, timeout=10)
-            else:
-                r = requests.get(urly, headers=headers, timeout=10)
+
+            r = requests.get(urly, headers=headers, proxies=proxies, timeout=12)
 
             if r.status_code == 429:
                 self.status = SearchStatus.FAILED_RATE_LIMIT
@@ -207,6 +243,14 @@ class EmailHarvester:
             if any(marker in self.results.lower() for marker in block_markers):
                 self.status = SearchStatus.PARTIAL_CAPTCHA
                 raise RuntimeError("Bot challenge detected")
+
+            # Parse and Save in Real-Time (US-13 Persistence)
+            prev_emails = set(self.parser.emails())
+            self.parser.extract(self.results, self.word)
+            new_emails = set(self.parser.emails()) - prev_emails
+
+            if new_emails and self.save_callback:
+                self.save_callback(list(new_emails))
 
             self.totalresults += self.results
 
@@ -228,10 +272,27 @@ class EmailHarvester:
                 self.do_search()
                 self.retry_count = 0  # Reset on success
             except RuntimeError:
+                # TOR Identity Refresh on failure (US-12)
+                if (
+                    self.status in [SearchStatus.FAILED_RATE_LIMIT, SearchStatus.PARTIAL_CAPTCHA]
+                    and self.tor_enabled
+                    and self.retry_count == 0
+                ):
+                    if self.progress_callback and self.task_id is not None:
+                        self.progress_callback(
+                            self.task_id, description=f"[yellow]Rotating TOR IP for {self.activeEngine}..."
+                        )
+
+                    if self.refresh_tor_identity():
+                        self.retry_count += 1
+                        time.sleep(5.0)  # Wait for circuit renewal
+                        continue  # Retry same batch with new IP
+
+                # Standard wait for non-TOR runs
                 if self.status == SearchStatus.FAILED_RATE_LIMIT and self.retry_count == 0:
                     self.retry_count += 1
-                    time.sleep(10.0)  # Cool down wait
-                    continue  # Retry same counter
+                    time.sleep(10.0)
+                    continue
 
                 if self.progress_callback and self.task_id is not None:
                     self.progress_callback(self.task_id, description=f"[red]{self.activeEngine} ({str(self.status)})")
