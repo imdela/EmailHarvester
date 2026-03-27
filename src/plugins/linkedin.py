@@ -28,18 +28,25 @@ from typing import Any
 app_emailharvester: Any = None
 
 
-def search(domain: str, limit: Any) -> list[str]:
+def search(domain: str, limit: int) -> list[str]:
     """
     Performs LinkedIn searching by aggregating results from Bing and Google.
+
+    Args:
+        domain (str): The domain to target for email extraction.
+        limit (int): Maximum number of results to fetch per engine.
+
+    Returns:
+        list[str]: Aggregated list of extracted email addresses.
     """
     all_emails = []
 
-    bing_url = "http://www.bing.com/search?q=site%3Alinkedin.com/in/+%40{{word}}&count=50&first={{counter}}"
+    bing_url = "http://www.bing.com/search?q=site%3Alinkedin.com/in/+%40{word}&count=50&first={counter}"
     app_emailharvester.init_search(bing_url, domain, limit, 0, 50, "LinkedIn [Bing]")
     app_emailharvester.process()
     all_emails.extend(app_emailharvester.get_emails())
 
-    google_url = 'https://www.google.com/search?num=100&start={{counter}}&hl=en&q=site%3Alinkedin.com+"%40{{word}}"'
+    google_url = 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Alinkedin.com+"%40{word}"'
     app_emailharvester.init_search(google_url, domain, limit, 0, 100, "LinkedIn [Google]")
     app_emailharvester.process()
     all_emails.extend(app_emailharvester.get_emails())
