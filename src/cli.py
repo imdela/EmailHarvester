@@ -57,24 +57,21 @@ def run_engine_thread(
     userAgent: str,
     proxy: Any,
     progress: Any,
-) -> list[str]:
+) -> tuple[list[str], str]:
     """
     Worker function to execute a single search engine sequentially within a thread.
     """
     # Create thread-local EmailHarvester instance to isolate instance state
     thread_app = EmailHarvester(userAgent, proxy)
 
-    # Setup progress bar
     task_id = progress.add_task(f"[cyan]Searching in {search_engine}...", total=limit)
     thread_app.progress_callback = progress.update
     thread_app.task_id = task_id
 
-    # Execute the specific engine search
     emails = thread_app.get_plugins()[search_engine]["search"](domain, limit)
 
-    # Complete task
     progress.update(task_id, completed=limit)
-    return list(emails)
+    return list(emails), str(thread_app.status)
 
 
 def main() -> None:
@@ -230,6 +227,7 @@ def main() -> None:
 
     final_emails = []
     failed_engines = []
+    engine_stats: list[tuple[str, int, str]] = []
 
     with Progress(
         SpinnerColumn(),
@@ -257,21 +255,30 @@ def main() -> None:
             for future in as_completed(future_to_engine):
                 engine_name = future_to_engine[future]
                 try:
-                    final_emails.extend(future.result())
+                    res, status = future.result()
+                    final_emails.extend(res)
+                    engine_stats.append((engine_name, len(res), status))
                 except Exception as e:
-                    progress.console.print(red(f"[-] Error in engine '{engine_name}': {e}"))
+                    progress.console.print(red(f"[-] Fatal error in thread '{engine_name}': {e}"))
                     failed_engines.append(engine_name)
+                    engine_stats.append((engine_name, 0, "FATAL_ERROR"))
 
     all_emails = unique(final_emails)
 
+    print(green("\n[+] Search Engine Diagnostics:"))
+    for engine_name, count, status in sorted(engine_stats):
+        symbol = green("[+]") if status == "SUCCESS" else yellow("[?]") if "PARTIAL" in status else red("[X]")
+        status_colored = green(status) if status == "SUCCESS" else yellow(status)
+        print(f"{symbol} {engine_name.capitalize()}: {cyan(str(count))} emails ({status_colored})")
+
     if failed_engines:
-        print(red(f"[-] The following engines failed: {', '.join(failed_engines)}"))
+        print(red(f"\n[-] The following engines hit fatal internal errors: {', '.join(failed_engines)}"))
 
     if not all_emails:
-        print(red("[-] No emails found"))
+        print(red("\n[-] No emails found"))
         sys.exit(4)
 
-    print(green("[+] Emails found: ") + cyan(str(len(all_emails))))
+    print(green("\n[+] Total unique emails found: ") + cyan(str(len(all_emails))))
 
     if not args.noprint:
         for emails in all_emails:

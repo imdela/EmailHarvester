@@ -39,6 +39,7 @@ import pkgutil
 import random
 import re
 import time
+from enum import StrEnum
 from sys import platform as _platform
 from typing import Any
 from urllib.parse import urlparse
@@ -100,6 +101,15 @@ class MyParser:
 ###################################################################
 
 
+class SearchStatus(StrEnum):
+    SUCCESS = "SUCCESS"
+    PARTIAL_BLOCKED = "PARTIAL_BLOCKED"
+    PARTIAL_CAPTCHA = "PARTIAL_CAPTCHA"
+    FAILED_TIMEOUT = "FAILED_TIMEOUT"
+    FAILED_FORBIDDEN = "FAILED_FORBIDDEN"
+    FAILED_RATE_LIMIT = "FAILED_RATE_LIMIT"
+
+
 class EmailHarvester:
     def __init__(self, userAgent: str, proxy: Any) -> None:
         """
@@ -116,6 +126,8 @@ class EmailHarvester:
         self.activeEngine = "None"
         self.progress_callback: Any = None
         self.task_id: Any = None
+        self.status = SearchStatus.SUCCESS
+        self.retry_count = 0
         plugins: dict[str, Any] = {}
         import src.plugins
 
@@ -134,7 +146,13 @@ class EmailHarvester:
         print(green(msg))
 
     def init_search(
-        self, url: str, word: str, limit: str | int, counterInit: str | int, counterStep: str | int, engineName: str
+        self,
+        url: str,
+        word: str,
+        limit: str | int,
+        counterInit: str | int,
+        counterStep: str | int,
+        engineName: str,
     ) -> None:
         """
         Configures the scraping constraints and limits for a specific plugin run.
@@ -155,44 +173,76 @@ class EmailHarvester:
         self.step = int(counterStep)
         self.word = word
         self.activeEngine = engineName
+        self.status = SearchStatus.SUCCESS
 
     def do_search(self) -> None:
         """
         Executes the network request bridging the explicitly formulated plugin URL.
 
         Raises:
-            SystemExit: Invoked natively if the network request fails fatally (Exit code 4).
+            RuntimeError: If a fatal error occurs (handled in process loop).
         """
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
             headers = {"User-Agent": self.userAgent}
             if self.proxy:
                 proxies = {self.proxy.scheme: "http://" + self.proxy.netloc}
-                r = requests.get(urly, headers=headers, proxies=proxies)
+                r = requests.get(urly, headers=headers, proxies=proxies, timeout=10)
             else:
-                r = requests.get(urly, headers=headers)
+                r = requests.get(urly, headers=headers, timeout=10)
 
+            if r.status_code == 429:
+                self.status = SearchStatus.FAILED_RATE_LIMIT
+                raise RuntimeError("429 Rate Limit")
+            if r.status_code == 403:
+                self.status = SearchStatus.FAILED_FORBIDDEN
+                raise RuntimeError("403 Forbidden")
+            r.raise_for_status()
+
+            if r.encoding is None:
+                r.encoding = "UTF-8"
+            self.results = r.content.decode(r.encoding)
+
+            block_markers = ["captcha", "unusual traffic", "automated requests", "g-recaptcha"]
+            if any(marker in self.results.lower() for marker in block_markers):
+                self.status = SearchStatus.PARTIAL_CAPTCHA
+                raise RuntimeError("Bot challenge detected")
+
+            self.totalresults += self.results
+
+        except requests.exceptions.Timeout as e:
+            self.status = SearchStatus.FAILED_TIMEOUT
+            raise RuntimeError(f"Connection timeout in {self.activeEngine}") from e
         except Exception as e:
-            raise RuntimeError(f"Network error in {self.activeEngine}: {e}") from e
-
-        if r.encoding is None:
-            r.encoding = "UTF-8"
-
-        self.results = r.content.decode(r.encoding)
-        self.totalresults += self.results
+            # Maintain the existing status if already set; otherwise use partial block
+            if self.status == SearchStatus.SUCCESS:
+                self.status = SearchStatus.PARTIAL_BLOCKED
+            raise RuntimeError(f"Engine interrupted: {e}") from e
 
     def process(self) -> None:
+        """
+        Orchestrates the iterative search process with resilient retry and break logic.
+        """
         while self.counter < self.limit:
-            self.do_search()
+            try:
+                self.do_search()
+                self.retry_count = 0  # Reset on success
+            except RuntimeError:
+                if self.status == SearchStatus.FAILED_RATE_LIMIT and self.retry_count == 0:
+                    self.retry_count += 1
+                    time.sleep(10.0)  # Cool down wait
+                    continue  # Retry same counter
+
+                if self.progress_callback and self.task_id is not None:
+                    self.progress_callback(self.task_id, description=f"[red]{self.activeEngine} ({str(self.status)})")
+                break
+
             time.sleep(random.uniform(0.7, 1.8))
             self.counter += self.step
             if self.progress_callback and self.task_id is not None:
                 self.progress_callback(self.task_id, advance=self.step)
             else:
-                print(
-                    green("[+] Searching in {}:".format(self.activeEngine))
-                    + cyan(" {} results".format(str(self.counter)))
-                )
+                print(green(f"[+] Searching in {self.activeEngine}:") + cyan(f" {str(self.counter)} results"))
 
     def get_emails(self) -> list[str]:
         self.parser.extract(self.totalresults, self.word)
