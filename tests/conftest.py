@@ -9,6 +9,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core import EmailHarvester
+from src.resilience import ResilienceManager
+
+
+@pytest.fixture(autouse=True)
+def reset_resilience_shared_state() -> Generator[None, None, None]:
+    """
+    Resets ResilienceManager's class-level shared state before every test.
+    Prevents USING/REJECTED IP entries from leaking across test boundaries.
+    """
+    with ResilienceManager._lock:
+        ResilienceManager._shared_ip_cache.clear()
+        ResilienceManager._shared_burst_count = 0
+    yield
+    with ResilienceManager._lock:
+        ResilienceManager._shared_ip_cache.clear()
+        ResilienceManager._shared_burst_count = 0
 
 
 @pytest.fixture

@@ -163,19 +163,31 @@ class ResilienceManager:
         time.sleep(jitter)
 
         # 2. Global Burst Mode (Host Protection)
+        # [FIX-1] Capture state inside the lock; sleep is applied OUTSIDE to avoid blocking all threads.
         b_conf = self._config.get("burst", {})
+        burst_pause: float = 0.0
         with ResilienceManager._lock:
             ResilienceManager._shared_burst_count += 1
             if ResilienceManager._shared_burst_count >= b_conf.get("threshold_requests", 6):
                 ResilienceManager._shared_burst_count = 0
-                pause = b_conf.get("pause_duration_s", 20)
-                print(colored(f"[~] Human-like pause triggered ({pause}s)...", "yellow"))
-                time.sleep(pause)
+                burst_pause = float(b_conf.get("pause_duration_s", 20))
+        if burst_pause > 0.0:
+            print(colored(f"[~] Human-like pause triggered ({burst_pause}s)...", "yellow"))
+            time.sleep(burst_pause)
 
         # 3. IP Health & Isolation
+        # [FIX-1] rotate_identity() is called OUTSIDE the lock to avoid serializing threads.
+        # "unknown" is a sentinel for failed IP detection — it is never a real circuit and
+        # must NOT enter the USING pool to avoid infinite retry loops.
         r_conf = self._config.get("resilience", {})
         while True:
             current_ip = self.get_current_ip()
+            needs_rotate = False
+
+            # Bypass pool management when IP detection fails — proceed without tracking.
+            if current_ip == "unknown":
+                return current_ip
+
             with ResilienceManager._lock:
                 data = ResilienceManager._shared_ip_cache.get(current_ip)
 
@@ -192,25 +204,29 @@ class ResilienceManager:
                 # Case: Busy IP
                 if status == ThreatLevel.USING:
                     print(colored(f"[!] IP {current_ip} is currently IN USE by another thread. Rotating...", "yellow"))
-                    self.rotate_identity()
-                    continue
+                    needs_rotate = True
 
                 # Case: Blacklisted
-                if status == ThreatLevel.BLACKLISTED:
+                elif status == ThreatLevel.BLACKLISTED:
                     print(colored(f"[!] IP {current_ip} is PERMANENTLY BLACKLISTED. Rotating...", "red"))
-                    self.rotate_identity()
-                    continue
+                    needs_rotate = True
 
                 # Case: Rejected (Quarantine)
-                if status == ThreatLevel.REJECTED:
+                elif status == ThreatLevel.REJECTED:
                     quarantine_min = r_conf.get("quarantine_duration_min", 60)
                     if datetime.now() > data["timestamp"] + timedelta(minutes=quarantine_min):
                         print(colored(f"[+] IP {current_ip} finished quarantine. Re-testing...", "green"))
                         data["status"] = ThreatLevel.USING
                         return current_ip
                     print(colored(f"[!] IP {current_ip} is in QUARANTINE. Rotating...", "yellow"))
-                    self.rotate_identity()
-                    continue
+                    needs_rotate = True
+
+            if needs_rotate:
+                rotated = self.rotate_identity()
+                # [FIX-2] Guard tight loop when TOR is disabled — yield CPU for 1s per retry cycle.
+                if not rotated:
+                    time.sleep(1.0)
+                continue
 
             return current_ip
 
@@ -221,8 +237,17 @@ class ResilienceManager:
             if data and data["status"] == ThreatLevel.USING:
                 del ResilienceManager._shared_ip_cache[ip]
 
-    def report_block(self, ip: str, reason: str = "unknown", permanent: bool = False) -> None:
-        """Reports a search engine block for the given IP."""
+    def report_block(self, ip: str, reason: str = "unknown", permanent: bool = False, rotate: bool = True) -> None:
+        """Reports a search engine block for the given IP.
+
+        Args:
+            ip: The external IP address to flag.
+            reason: A human-readable description of the block cause.
+            permanent: If True, the IP is marked BLACKLISTED; otherwise REJECTED.
+            rotate: If True, trigger a TOR identity rotation after marking the block.
+                    Set to False when the caller's retry loop already handles rotation
+                    to avoid a double rotation penalty.
+        """
         status = ThreatLevel.BLACKLISTED if permanent else ThreatLevel.REJECTED
         with ResilienceManager._lock:
             existing = ResilienceManager._shared_ip_cache.get(ip, {})
@@ -241,4 +266,7 @@ class ResilienceManager:
             }
         self.save_cache()
         print(colored(f"[-] IP {ip} marked as {status} (Reason: {reason}). Circuit flagged.", "red"))
-        self.rotate_identity()
+        # [FIX-6] Only rotate when explicitly requested — avoids double 15s penalty
+        # when the calling retry loop (e.g. process() in core.py) already handles rotation.
+        if rotate:
+            self.rotate_identity()

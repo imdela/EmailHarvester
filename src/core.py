@@ -448,11 +448,12 @@ class EmailHarvester:
             r = requests.get(urly, headers=headers, proxies=proxies, timeout=self.settings.timeout)
 
             if r.status_code == 429:
-                self.resilience.report_block(current_ip, reason="429 Rate Limit", permanent=False)
+                # [FIX-6] rotate=False: process() retry loop already handles rotation
+                self.resilience.report_block(current_ip, reason="429 Rate Limit", permanent=False, rotate=False)
                 self.status = SearchStatus.FAILED_RATE_LIMIT
                 raise RateLimitError("429 Rate Limit")
             if r.status_code == 403:
-                self.resilience.report_block(current_ip, reason="403 Forbidden", permanent=True)
+                self.resilience.report_block(current_ip, reason="403 Forbidden", permanent=True, rotate=False)
                 self.status = SearchStatus.FAILED_FORBIDDEN
                 raise ForbiddenError("403 Forbidden")
             r.raise_for_status()
@@ -463,7 +464,7 @@ class EmailHarvester:
 
             block_markers = ["captcha", "unusual traffic", "automated requests", "g-recaptcha"]
             if any(marker in self.results.lower() for marker in block_markers):
-                self.resilience.report_block(current_ip, reason="Bot Challenge", permanent=False)
+                self.resilience.report_block(current_ip, reason="Bot Challenge", permanent=False, rotate=False)
                 self.status = SearchStatus.PARTIAL_CAPTCHA
                 raise SearchBlockedError("Bot challenge detected")
 
@@ -538,7 +539,11 @@ class EmailHarvester:
                     continue
 
                 if self.progress_callback and self.task_id is not None:
-                    self.progress_callback(self.task_id, description=f"[red]{self.activeEngine} ({str(self.status)})")
+                    # [FIX-5] Include batch index so dashboard shows e.g. "PARTIAL_CAPTCHA @ Batch 50"
+                    self.progress_callback(
+                        self.task_id,
+                        description=f"[red]{self.activeEngine} ({str(self.status)}) @ Batch {self.counter}",
+                    )
 
                 # TI-02: Self-Healing Probe on hard failure
                 if not self.probe.verify_plugin(self.activeEngine.lower()):
