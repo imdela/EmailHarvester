@@ -1,0 +1,100 @@
+# Search Engine Configurations for EmailHarvester
+# This file allows updating search URLs and pagination parameters without modifying Python code.
+
+plugins:
+  google:
+    sources:
+      - name: "Google"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q="%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  ask:
+    sources:
+      - name: "Ask"
+        url: "http://www.ask.com/web?q=%40{word}&page={counter}"
+        counter_init: 1
+        counter_step: 1
+  baidu:
+    sources:
+      - name: "Baidu"
+        url: 'http://www.baidu.com/search/s?wd="%40{word}"&pn={counter}'
+        counter_init: 0
+        counter_step: 10
+  bing:
+    sources:
+      - name: "Bing"
+        url: "http://www.bing.com/search?q=%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+  dogpile:
+    sources:
+      - name: "Dogpile"
+        url: 'http://www.dogpile.com/search/web?qsi={counter}&q="%40{word}"'
+        counter_init: 1
+        counter_step: 10
+  yahoo:
+    sources:
+      - name: "Yahoo"
+        url: "http://search.yahoo.com/search?p=%40{word}&n=100&ei=UTF-8&va_vt=any&vo_vt=any&ve_vt=any&vp_vt=any&vd=all&vst=0&vf=all&vm=p&fl=0&fr=yfp-t-152&xargs=0&pstart=1&b={counter}"
+        counter_init: 1
+        counter_step: 100
+  github:
+    sources:
+      - name: "GitHub [Bing]"
+        url: "http://www.bing.com/search?q=site%3Agithub.com+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "GitHub [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Agithub.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  instagram:
+    sources:
+      - name: "Instagram [Bing]"
+        url: "http://www.bing.com/search?q=site%3Ainstagram.com+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "Instagram [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Ainstagram.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  linkedin:
+    sources:
+      - name: "LinkedIn [Bing]"
+        url: "http://www.bing.com/search?q=site%3Alinkedin.com/in/+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "LinkedIn [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Alinkedin.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  reddit:
+    sources:
+      - name: "Reddit [Bing]"
+        url: "http://www.bing.com/search?q=site%3Areddit.com+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "Reddit [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Areddit.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  twitter:
+    sources:
+      - name: "Twitter [Bing]"
+        url: "http://www.bing.com/search?q=site%3Atwitter.com+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "Twitter [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Atwitter.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100
+  youtube:
+    sources:
+      - name: "YouTube [Bing]"
+        url: "http://www.bing.com/search?q=site%3Ayoutube.com+%40{word}&count=50&first={counter}"
+        counter_init: 0
+        counter_step: 50
+      - name: "YouTube [Google]"
+        url: 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Ayoutube.com+"%40{word}"'
+        counter_init: 0
+        counter_step: 100

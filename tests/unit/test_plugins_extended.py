@@ -30,10 +30,10 @@ def test_plugin_search_execution(mock_requests_get: MagicMock, plugin_name: str)
     # Mock EmailHarvester instance
     mock_app = MagicMock()
     mock_app.get_emails.return_value = ["test@example.com"]
-
-    # Inject mock into plugin's global or local scope if it's there
-    if hasattr(mod, "app_emailharvester"):
-        mod.app_emailharvester = mock_app  # type: ignore[attr-defined]
+    # Mock plugin configuration retrieval
+    mock_app.get_plugin_config.return_value = [
+        {"url": "http://engine.com/{counter}&q={word}", "counter_init": 0, "counter_step": 1, "name": plugin_name}
+    ]
 
     # Some plugins might use a Plugin class that registers the function
     # Let's mock registration and direct call

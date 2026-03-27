@@ -27,39 +27,27 @@ from typing import Any
 
 
 def search(domain: str, limit: int, harvester: Any) -> list[str]:
-    """Executes the search and harvest sequence for GitHub via Bing and Google.
+    """Executes the search and harvest sequence for GitHub.
 
-    Args:
-        domain: The target domain to harvest email addresses for.
-        limit: The maximum number of search result pages/items to parse per engine.
-        harvester: The EmailHarvester instance to use for processing.
-
-    Returns:
-        A aggregated list of harvested email addresses.
+    Retrieves configurations from the harvester's centralized YAML registry.
     """
-    all_emails = []
-
-    bing_url = "http://www.bing.com/search?q=site%3Agithub.com+%40{word}&count=50&first={counter}"
-    harvester.init_search(bing_url, domain, limit, 0, 50, "GitHub [Bing]")
-    harvester.process()
-    all_emails.extend(harvester.get_emails())
-
-    google_url = 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Agithub.com+"%40{word}"'
-    harvester.init_search(google_url, domain, limit, 0, 100, "GitHub [Google]")
-    harvester.process()
-    all_emails.extend(harvester.get_emails())
-
-    return all_emails
+    configs = harvester.get_plugin_config("github")
+    for config in configs:
+        harvester.init_search(
+            config["url"],
+            domain,
+            limit,
+            config["counter_init"],
+            config["counter_step"],
+            config["name"],
+        )
+        harvester.process()
+    return list(harvester.get_emails())
 
 
 class Plugin:
     """Plugin bridge for searching emails on GitHub."""
 
     def __init__(self, app: Any, _conf: dict[str, Any]) -> None:
-        """Initializes the plugin and registers its search method.
-
-        Args:
-            app: The parent EmailHarvester orchestrator to register with.
-            _conf: Configuration dictionary containing User-Agent and proxy settings.
-        """
+        """Initializes the plugin and registers its search method."""
         app.register_plugin("github", {"search": search})

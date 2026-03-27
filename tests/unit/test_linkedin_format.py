@@ -15,6 +15,11 @@ def test_url_formatting_placeholders() -> None:
     def mock_init(url: str, *args: Any, **kwargs: Any) -> None:
         captured_urls.append(url)
 
+    mock_app.init_search = mock_init
+    mock_app.get_plugin_config.return_value = [
+        {"url": "http://engine.com/{counter}&q={word}", "counter_init": 0, "counter_step": 1, "name": "LinkedIn"}
+    ]
+
     # Trigger plugin search
     linkedin.search("example.com", 10, mock_app)
 

@@ -29,17 +29,19 @@ from typing import Any
 def search(domain: str, limit: int, harvester: Any) -> list[str]:
     """Executes the search and harvest sequence for the Dogpile engine.
 
-    Args:
-        domain: The target domain to harvest email addresses for.
-        limit: The maximum number of search result pages/items to parse.
-        harvester: The EmailHarvester instance to use for processing.
-
-    Returns:
-        A list of harvested email addresses.
+    Retrieves configurations from the harvester's centralized YAML registry.
     """
-    url = 'http://www.dogpile.com/search/web?qsi={counter}&q="%40{word}"'
-    harvester.init_search(url, domain, limit, 1, 10, "Dogpile")
-    harvester.process()
+    configs = harvester.get_plugin_config("dogpile")
+    for config in configs:
+        harvester.init_search(
+            config["url"],
+            domain,
+            limit,
+            config["counter_init"],
+            config["counter_step"],
+            config["name"],
+        )
+        harvester.process()
     return list(harvester.get_emails())
 
 
@@ -47,10 +49,5 @@ class Plugin:
     """Plugin bridge for the Dogpile search engine."""
 
     def __init__(self, app: Any, _conf: dict[str, Any]) -> None:
-        """Initializes the plugin and registers its search method.
-
-        Args:
-            app: The parent EmailHarvester orchestrator to register with.
-            _conf: Configuration dictionary containing User-Agent and proxy settings.
-        """
+        """Initializes the plugin and registers its search method."""
         app.register_plugin("dogpile", {"search": search})

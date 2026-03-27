@@ -35,6 +35,7 @@ __maintainer__ = "maldevel"
 
 import argparse
 import importlib
+import os
 import pkgutil
 import random
 import re
@@ -46,6 +47,7 @@ from urllib.parse import urlparse
 
 import requests
 import validators
+import yaml
 from fake_useragent import UserAgent
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -285,6 +287,7 @@ class EmailHarvester:
             tor_enabled: Whether to route traffic through TOR and rotate identities.
         """
         self.settings = Settings()
+        self.plugin_configs: dict[str, Any] = self._load_engines_config()
         self.plugins: dict[str, Any] = {}
         self.proxy = proxy
         self.tor_enabled = tor_enabled
@@ -317,6 +320,40 @@ class EmailHarvester:
             mod = importlib.import_module(f"src.plugins.{modname}")
             if hasattr(mod, "Plugin"):
                 plugins[modname] = mod.Plugin(self, {"useragent": userAgent, "proxy": proxy})
+
+    def _load_engines_config(self) -> dict[str, Any]:
+        """Loads search engine definitions from the local YAML configuration.
+
+        Returns:
+            A dictionary containing plugin rules indexed by plugin name.
+        """
+        config_path = os.path.join(os.path.dirname(__file__), "config", "engines.yaml")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+                if not isinstance(config, dict):
+                    return {}
+                plugins = config.get("plugins", {})
+                return plugins if isinstance(plugins, dict) else {}
+        except (OSError, yaml.YAMLError) as e:
+            # Fallback to empty if not found, though plugins will fail during init
+            print(f"[-] Warning: Could not load {config_path}: {e}")
+            return {}
+
+    def get_plugin_config(self, plugin_name: str) -> list[dict[str, Any]]:
+        """Retrieves the source configurations for a specific plugin.
+
+        Args:
+            plugin_name: The internal name of the plugin to fetch config for.
+
+        Returns:
+            A list of source configuration dictionaries.
+        """
+        plugin_data = self.plugin_configs.get(plugin_name, {})
+        if not isinstance(plugin_data, dict):
+            return []
+        sources = plugin_data.get("sources", [])
+        return sources if isinstance(sources, list) else []
 
     def refresh_tor_identity(self) -> bool:
         """Commands the configured TOR service to rotate the circuit.

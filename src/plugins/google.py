@@ -29,8 +29,7 @@ from typing import Any
 def search(domain: str, limit: int, harvester: Any) -> list[str]:
     """Executes the search and harvest sequence for the Google engine.
 
-    Formulates the search URL and initiates the iterative scraping process
-    through the provided harvester instance.
+    Retrieves configurations from the harvester's centralized YAML registry.
 
     Args:
         domain: The target domain to harvest email addresses for.
@@ -40,9 +39,17 @@ def search(domain: str, limit: int, harvester: Any) -> list[str]:
     Returns:
         A list of harvested email addresses.
     """
-    url = 'https://www.google.com/search?num=100&start={counter}&hl=en&q="%40{word}"'
-    harvester.init_search(url, domain, limit, 0, 100, "Google")
-    harvester.process()
+    configs = harvester.get_plugin_config("google")
+    for config in configs:
+        harvester.init_search(
+            config["url"],
+            domain,
+            limit,
+            config["counter_init"],
+            config["counter_step"],
+            config["name"],
+        )
+        harvester.process()
     return list(harvester.get_emails())
 
 
