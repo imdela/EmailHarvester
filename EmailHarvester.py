@@ -355,19 +355,21 @@ if __name__ == "__main__":
     plugins = app.get_plugins()
 
     all_emails = []
-    excluded = []
-    if args.exclude:
-        excluded = args.exclude.split(",")
+    excluded = args.exclude.split(",") if args.exclude else []
+
+    engines_to_run = []
     if engine == "all":
         print(green("[+] Searching everywhere"))
-        for search_engine in plugins:
-            if search_engine not in excluded:
-                all_emails += plugins[search_engine]["search"](domain, limit)
-    elif engine not in plugins:
-        print(red("[-] Search engine plugin not found"))
-        sys.exit(3)
+        engines_to_run = [e for e in plugins if e not in excluded]
     else:
-        all_emails = plugins[engine]["search"](domain, limit)
+        engines_to_run = [e.strip() for e in engine.split(",")]
+        for e in engines_to_run:
+            if e not in plugins:
+                print(red("[-] Search engine plugin not found: " + e))
+                sys.exit(3)
+
+    for search_engine in engines_to_run:
+        all_emails += plugins[search_engine]["search"](domain, limit)
     all_emails = unique(all_emails)
 
     if not all_emails:
