@@ -6,11 +6,11 @@ Implement a new search engine plugin for DuckDuckGo using its "Lite" (non-JavaSc
 
 ## Acceptance Criteria
 
-- [ ] Add DuckDuckGo Lite configuration (URL, pagination) to `src/config/engines.yaml`.
-- [ ] Create `src/plugins/duckduckgo.py` following the new stateless architecture.
-- [ ] Ensure the plugin correctly handles DuckDuckGo Lite's specific HTML structure for result parsing.
-- [ ] Add unit tests specifically for DuckDuckGo parsing logic.
-- [ ] Verify functionality through TOR in a real-world test.
+- [x] Add DuckDuckGo Lite configuration (URL, pagination) to `src/config/engines.yaml`.
+- [x] Create `src/plugins/duckduckgo.py` following the new stateless architecture.
+- [x] Ensure the plugin correctly handles DuckDuckGo Lite's specific HTML structure for result parsing.
+- [x] Add unit tests specifically for DuckDuckGo parsing logic.
+- [x] Verify functionality through TOR in a real-world test.
 
 ---
-**Status:** Open
+**Status:** COMPLETED
