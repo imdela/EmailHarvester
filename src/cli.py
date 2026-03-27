@@ -63,6 +63,19 @@ def run_engine_thread(
 ) -> tuple[list[str], str]:
     """
     Worker function to execute a single search engine sequentially within a thread.
+
+    Args:
+        search_engine (str): Name of the search engine plugin to run.
+        domain (str): The target domain to harvest email addresses from.
+        limit (int): The maximum number of results to fetch.
+        userAgent (str): The User-Agent string to use for HTTP requests.
+        proxy (Any): Parsed proxy URL configuration, if any.
+        tor (bool): Flag indicating whether TOR proxy routing is active.
+        progress (Any): Rich Progress bar instance for UI updates.
+        save_callback (Any, optional): Callback function for stream-to-disk persistence.
+
+    Returns:
+        tuple[list[str], str]: A tuple containing the list of harvested emails and the final exit status.
     """
     # Create thread-local EmailHarvester instance to isolate instance state
     thread_app = EmailHarvester(userAgent, proxy, tor_enabled=tor)
@@ -79,6 +92,10 @@ def run_engine_thread(
 
 
 def main() -> None:
+    """
+    Main entry point for the EmailHarvester CLI.
+    Parses arguments, orchestrates plugin threads, and aggregates execution metrics.
+    """
     parser = argparse.ArgumentParser(
         description=r"""
 

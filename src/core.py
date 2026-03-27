@@ -194,7 +194,10 @@ class EmailHarvester:
 
     def refresh_tor_identity(self) -> bool:
         """
-        Commands the local TOR service to rotate the circuit and provide a new IP. (US-12)
+        Commands the configured TOR service to rotate the circuit and provide a new IP.
+
+        Returns:
+            bool: True if the identity was successfully refreshed, False otherwise.
         """
         try:
             with Controller.from_port(
@@ -207,9 +210,22 @@ class EmailHarvester:
             return False
 
     def register_plugin(self, search_method: str, functions: dict[str, Any]) -> None:
+        """
+        Registers a search engine plugin dynamically into the system.
+
+        Args:
+            search_method (str): The unique identifier/name for the plugin engine.
+            functions (dict[str, Any]): A dictionary containing the plugin's execution hooks.
+        """
         self.plugins[search_method] = functions
 
     def get_plugins(self) -> dict[str, Any]:
+        """
+        Retrieves all currently registered plugins and their corresponding hook architectures.
+
+        Returns:
+            dict[str, Any]: A mapping of plugin names to their function hook dictionaries.
+        """
         return self.plugins
 
     def show_message(self, msg: str) -> None:
