@@ -32,6 +32,16 @@ app_emailharvester: Any = None
 
 
 def search(domain: str, limit: Any) -> list[str]:
+    """
+    Executes the search and harvest sequence for this specific engine.
+
+    Args:
+        domain (str): The target domain to harvest email addresses for.
+        limit (Any): The maximum number of search result pages/items to parse.
+
+    Returns:
+        list[str]: A list of harvested email addresses.
+    """
     url = 'http://www.dogpile.com/search/web?qsi={counter}&q="%40{word}"'
     app_emailharvester.init_search(url, domain, limit, 1, 10, "Dogpile")
     app_emailharvester.process()

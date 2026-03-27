@@ -30,7 +30,14 @@ app_emailharvester: Any = None
 
 def search(domain: str, limit: Any) -> list[str]:
     """
-    Performs Instagram searching by aggregating results from Bing and Google.
+    Executes the search and harvest sequence for this specific engine by aggregating from Bing and Google.
+
+    Args:
+        domain (str): The target domain to harvest email addresses for.
+        limit (Any): The maximum number of search result pages/items to parse.
+
+    Returns:
+        list[str]: A list of harvested email addresses.
     """
     all_emails = []
 

@@ -91,6 +91,16 @@ class AskSearch(object):
 
 
 def search(domain: str, limit: Any) -> list[str]:
+    """
+    Executes the search and harvest sequence for this specific engine.
+
+    Args:
+        domain (str): The target domain to harvest email addresses for.
+        limit (Any): The maximum number of search result pages/items to parse.
+
+    Returns:
+        list[str]: A list of harvested email addresses.
+    """
     url = "http://www.ask.com/web?q=%40{word}&page={page}"
     search = AskSearch(url, domain, limit)
     search.process()

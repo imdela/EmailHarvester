@@ -14,7 +14,7 @@ This checklist tracks the remediation steps required to close the gaps identifie
 - [x] **Fix TI-05 (Stealth Jitter Unit Tests)**:
   - Add a dedicated test in `tests/test_stealth.py` that verifies the engine correctly tracks its `burst_count` and triggers the long `time.sleep` (15-30s) strictly on the 5th request iteration.
 
-- [ ] **Fix TI-07 (Plugin Layer Docstrings)**:
+- [x] **Fix TI-07 (Plugin Layer Docstrings)**:
   - Enforce PEP 257 Google-Style compliance by adding complete `Args:` and `Returns:` docstrings to the `search()` function of ALL remaining plugin files (ask, baidu, bing, dogpile, github, google, instagram, reddit, twitter, yahoo, youtube).
 
 - [ ] **Fix TI-08 (True Pytest Refactoring)**:
