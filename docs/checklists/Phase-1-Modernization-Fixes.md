@@ -8,7 +8,7 @@ This checklist tracks the remediation steps required to close the gaps identifie
   - Update `src/cli.py` to intercept `RateLimitError`, `ForbiddenError`, and `SearchBlockedError`, formatting them into user-friendly Rich dashboard messages rather than a generic `Exception`.
   - Replace the bare `RuntimeError` explicitly raised inside `src/plugins/ask.py` using our new custom hierarchy.
 
-- [ ] **Fix TI-04 (Pydantic Fail-Fast Tests)**:
+- [x] **Fix TI-04 (Pydantic Fail-Fast Tests)**:
   - Create a test case (e.g., in `tests/test_settings.py`) explicitly proving that an invalid environment configuration (like `EH_TIMEOUT=-5`) triggers a `ValidationError` preventing unsafe engine startup.
 
 - [ ] **Fix TI-05 (Stealth Jitter Unit Tests)**:
