@@ -1,3 +1,7 @@
+"""
+Plugin explicitly built to interface natively with the email harvester 'googleplus' engine.
+"""
+
 from typing import Any
 
 """
@@ -23,13 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 For more see the file 'LICENSE' for copying permission.
 """
 
-# config: Any = None
+
 app_emailharvester: Any = None
 
 
 def search(domain: str, limit: Any) -> list[str]:
-    # search google+ only with google search engine
-    # who is gonna have google+ indexed better than google itself?
+
     url = 'https://www.google.com/search?num=100&start={counter}&hl=en&q=site%3Aplus.google.com+intext:"Works at"+-inurl:photos+-inurl:about+-inurl:posts+-inurl:plusones+%40{word}'
     app_emailharvester.init_search(url, domain, limit, 0, 100, "Google+")
     app_emailharvester.process()
@@ -37,8 +40,8 @@ def search(domain: str, limit: Any) -> list[str]:
 
 
 class Plugin:
-    def __init__(self, app: Any, conf: dict[str, Any]) -> None:  #
-        global app_emailharvester, config
-        # config = conf
+    def __init__(self, app: Any, conf: dict[str, Any]) -> None:
+
         app.register_plugin("googleplus", {"search": search})
+        global app_emailharvester
         app_emailharvester = app

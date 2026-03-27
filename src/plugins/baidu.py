@@ -1,3 +1,7 @@
+"""
+Plugin explicitly built to interface natively with the email harvester 'baidu' engine.
+"""
+
 from typing import Any
 
 """
@@ -23,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 For more see the file 'LICENSE' for copying permission.
 """
 
-# config: Any = None
+
 app_emailharvester: Any = None
 
 
@@ -35,8 +39,8 @@ def search(domain: str, limit: Any) -> list[str]:
 
 
 class Plugin:
-    def __init__(self, app: Any, conf: dict[str, Any]) -> None:  #
-        global app_emailharvester, config
-        # config = conf
+    def __init__(self, app: Any, conf: dict[str, Any]) -> None:
+
         app.register_plugin("baidu", {"search": search})
+        global app_emailharvester
         app_emailharvester = app

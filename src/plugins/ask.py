@@ -1,4 +1,6 @@
 """
+Plugin explicitly built to interface natively with the email harvester 'ask' engine.
+
 This file is part of EmailHarvester
 Copyright (C) 2016 @maldevel
 https://github.com/maldevel/EmailHarvester

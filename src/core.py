@@ -58,11 +58,21 @@ if _platform == "win32":
 
 class MyParser:
     def __init__(self) -> None:
+        """
+        Initializes the parsing buffer.
+        """
         self.temp: list[str] = []
         self.results: str = ""
         self.word: str = ""
 
     def extract(self, results: str, word: str) -> None:
+        """
+        Loads the raw HTML text and the target search word into the parser.
+
+        Args:
+            results (str): The raw HTML or text corpus containing potential emails.
+            word (str): The domain suffix (e.g., '@github.com') to search for.
+        """
         self.results = results
         self.word = word
 
@@ -92,6 +102,13 @@ class MyParser:
 
 class EmailHarvester:
     def __init__(self, userAgent: str, proxy: Any) -> None:
+        """
+        Initializes the EmailHarvester engine and dynamically loads search plugins.
+
+        Args:
+            userAgent (str): The HTTP user-agent string used for native web requests.
+            proxy (Any): An optional parsed proxy configuration URL object.
+        """
         self.plugins: dict[str, Any] = {}
         self.proxy = proxy
         self.userAgent = userAgent
@@ -117,6 +134,17 @@ class EmailHarvester:
     def init_search(
         self, url: str, word: str, limit: str | int, counterInit: str | int, counterStep: str | int, engineName: str
     ) -> None:
+        """
+        Configures the scraping constraints and limits for a specific plugin run.
+
+        Args:
+            url (str): The paginated URL structure belonging to the target plugin.
+            word (str): The target domain to harvest explicitly.
+            limit (str | int): Maximum total result pages to query natively.
+            counterInit (str | int): Starting offset parameter for pagination.
+            counterStep (str | int): Step size to increment pagination natively.
+            engineName (str): String identifier belonging to the current executor plugin.
+        """
         self.results = ""
         self.totalresults = ""
         self.limit = int(limit)
@@ -127,6 +155,12 @@ class EmailHarvester:
         self.activeEngine = engineName
 
     def do_search(self) -> None:
+        """
+        Executes the network request bridging the explicitly formulated plugin URL.
+
+        Raises:
+            SystemExit: Invoked natively if the network request fails fatally (Exit code 4).
+        """
         try:
             urly = self.url.format(counter=str(self.counter), word=self.word)
             headers = {"User-Agent": self.userAgent}
