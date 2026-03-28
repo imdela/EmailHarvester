@@ -135,8 +135,8 @@ class EngineProbe:
 
         # Attempt a minimal check using the harvester's networking settings
         try:
-            # We use a neutral test domain
-            test_url = "https://www.google.com"  # Default fallback for connectivity
+            # We use a neutral test domain that accepts Tor traffic
+            test_url = "https://check.torproject.org/api/ip"
 
             # If we were to be more precise, we'd need the base URL from the plugin
             # But most search engines can be 'pinged' by their hostname
@@ -149,7 +149,7 @@ class EngineProbe:
                     "https": f"socks5h://{self.harvester.settings.tor_host}:{self.harvester.settings.tor_port}",
                 }
 
-            r = requests.get(test_url, headers=headers, proxies=proxies, timeout=5)
+            r = requests.get(test_url, headers=headers, proxies=proxies, timeout=self.harvester.settings.timeout)
 
             # Simple check: 200 OK and no immediate block markers
             if r.status_code != 200:
@@ -258,16 +258,26 @@ class PluginConfigurationError(EmailHarvesterError):
 class Settings(BaseSettings):
     """
     Validates and centralizes initial environment configurations for EmailHarvester.
+    Requires a valid .env file to be present at the project root (EH_ prefix).
     """
 
-    user_agent_platform: str = Field(default="desktop", description="Platform for fake-useragent")
-    tor_host: str = Field(default="127.0.0.1", description="Local/Remote TOR host address")
-    tor_port: int = Field(default=9050, description="TOR SOCKS5 port")
-    tor_control_port: int = Field(default=9051, description="TOR Control port")
-    tor_control_password: str = Field(default="emailharvester_secret", description="TOR Control password")
-    timeout: int = Field(default=12, description="HTTP request timeout in seconds", gt=0)
+    user_agent_platform: str = Field(description="Platform for fake-useragent, e.g. 'desktop'")
+    tor_host: str = Field(description="Local/Remote TOR host address")
+    tor_port: int = Field(description="TOR SOCKS5 port")
+    tor_control_port: int = Field(description="TOR Control port")
+    tor_control_password: str = Field(description="TOR Control password")
+    timeout: int = Field(description="HTTP request timeout in seconds", gt=0)
 
-    model_config = SettingsConfigDict(env_prefix="EH_")
+    model_config = SettingsConfigDict(env_prefix="EH_", env_file=".env", env_file_encoding="utf-8")
+
+    def __init__(self, **values: Any) -> None:
+        env_file = self.model_config.get("env_file", ".env")
+        if env_file is None or not os.path.exists(str(env_file)):
+            raise FileNotFoundError(
+                f"Required environment configuration file '{env_file}' not found. "
+                "Please create it before starting the application."
+            )
+        super().__init__(**values)
 
 
 class EmailHarvester:
