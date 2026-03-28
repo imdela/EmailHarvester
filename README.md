@@ -33,9 +33,9 @@ git clone https://github.com/imdela/EmailHarvester.git && cd EmailHarvester
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# 3. (Optional) Setup TOR for Stealth
-sudo apt install tor
-# Ensure ControlPort 9051 and CookieAuthentication are setup in /etc/tor/torrc
+# 3. (Optional) Run TOR via Docker
+docker compose up -d
+# This starts a pre-configured TOR container with ControlPort 9051 active.
 ```
 
 ---
@@ -48,8 +48,8 @@ usage: EmailHarvester.py [-h] [-d DOMAIN] [-s FILE] [-e ENGINE] [-l LIMIT]
                          [-r EXCLUDE] [-p]
 
 options:
-  -d, --domain      Target domain (e.g., payoneer.com)
-  -s, --save        Output filename. Defaults to DOMAIN.txt if not specified.
+  -d, --domain      Target domain (e.g., domain.com)
+  -s, --save        Output filename. Defaults to domain.com.txt if omitted.
   -e, --engine      explicit engines (google, bing, all, etc)
   -l, --limit       Search result offset limit (pagination) per engine
   -x, --proxy       HTTP/HTTPS proxy (e.g. http://127.0.0.1:8080)
@@ -62,7 +62,8 @@ options:
 
 **High-Performance Stealth Run (TOR + 2000 Batch Limit):**
 ```bash
-python3 EmailHarvester.py -d test.com -e all -l 2000 --tor -s results_test
+python3 EmailHarvester.py -d domain.com -e all -l 2000 --tor
+# Generates domain.com.txt and domain.com.xml automatically.
 ```
 
 ---
@@ -74,8 +75,8 @@ The project maintains a 100% test-green policy with strict static analysis:
 # Static Analysis
 ruff format src/ && mypy src/ --strict
 
-# Full Test Suite (15+ Tests)
-python3 -m unittest discover tests -v
+# Full Test Suite
+PYTHONPATH=. venv/bin/python3 -m pytest tests/unit/ -v
 ```
 
 ---
