@@ -22,6 +22,7 @@ For more see the file 'LICENSE' for copying permission.
 """
 
 import argparse
+import os
 import random
 import sys
 import threading
@@ -260,6 +261,11 @@ def main() -> None:
     limit = args.limit
     engine = args.engine
 
+    # [TI-11] Result directory management
+    RESULTS_DIR = "results"
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    filename = os.path.join(RESULTS_DIR, filename)
+
     # Persistent Writing State (US-13)
     file_lock = threading.Lock()
     global_emails: set[str] = set()  # Keep track of emails already written to file
@@ -385,12 +391,12 @@ def main() -> None:
         # Note: TXT file is already written in real-time by save_email_callback (US-13).
         # We only generate the XML file at the end to ensure a clean final set.
         try:
-            xml_filename = filename.split(".")[0] + ".xml"
+            xml_filename = f"{filename}.xml"
             with open(xml_filename, "w") as out_file:
                 out_file.write('<?xml version="1.0" encoding="UTF-8"?><EmailHarvester>')
                 for email in all_emails:
                     out_file.write("<email>{}</email>".format(email))
                 out_file.write("</EmailHarvester>")
-            print(green("[+] Files saved"))
+            print(green("[+] Files saved to: ") + cyan(RESULTS_DIR))
         except Exception as er:
             print(red("[-] Error saving XML file: " + str(er)))

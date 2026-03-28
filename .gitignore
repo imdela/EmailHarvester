@@ -69,3 +69,4 @@ RemoteSystemsTempFiles
 .settings
 *.prefs
 src/config/ip_health.csv
+results/
