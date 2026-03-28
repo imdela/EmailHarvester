@@ -122,6 +122,8 @@ def test_rotate_identity_fails_when_tor_disabled(manager: ResilienceManager) -> 
 def test_rotate_identity_success(tor_manager: ResilienceManager) -> None:
     """Verify that rotate_identity signals NEWNYM and returns True on success."""
     mock_ctrl = MagicMock()
+    mock_ctrl.get_newnym_wait.return_value = 0  # Fix: Return numeric 0 to avoid comparing MagicMock to int
+
     mock_ctx = MagicMock()
     mock_ctx.__enter__ = MagicMock(return_value=mock_ctrl)
     mock_ctx.__exit__ = MagicMock(return_value=False)
@@ -156,12 +158,18 @@ def test_pre_flight_check_clean_ip_success(manager: ResilienceManager) -> None:
         assert ResilienceManager._shared_ip_cache["10.0.0.1"]["status"] == ThreatLevel.USING
 
 
-def test_pre_flight_check_unknown_ip_bypasses_pool_success(manager: ResilienceManager) -> None:
-    """Verify that 'unknown' (failed IP detection) is returned immediately without pool entry."""
-    with patch.object(manager, "get_current_ip", return_value="unknown"), patch("src.resilience.time.sleep"):
-        ip = manager.pre_flight_check()
+def test_pre_flight_check_unknown_ip_raises_connectivity_error_success(manager: ResilienceManager) -> None:
+    """Verify that 'unknown' IP detection raises ConnectivityError after retries (FIX-CONNECTIVITY)."""
+    from src.resilience import ConnectivityError
 
-    assert ip == "unknown"
+    with (
+        patch.object(manager, "get_current_ip", return_value="unknown"),
+        patch.object(manager, "rotate_identity", return_value=True),
+        patch("src.resilience.time.sleep"),
+    ):
+        with pytest.raises(ConnectivityError):
+            manager.pre_flight_check()
+
     with ResilienceManager._lock:
         assert "unknown" not in ResilienceManager._shared_ip_cache, "'unknown' must never enter the USING pool"
 

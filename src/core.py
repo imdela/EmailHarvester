@@ -37,6 +37,7 @@ import argparse
 import importlib
 import os
 import pkgutil
+import random
 import re
 import time
 from enum import StrEnum
@@ -53,6 +54,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from termcolor import colored
 
 import src.resilience as resilience
+from src.resilience import ConnectivityError
 
 ################################
 
@@ -539,7 +541,12 @@ class EmailHarvester:
 
                     if self.resilience.rotate_identity():
                         self.retry_count += 1
-                        time.sleep(5.0)  # Wait for circuit renewal
+                        # Use randomized circuit wait from config
+                        stab_range = self.resilience._config.get("timing", {}).get(
+                            "circuit_stabilization_range", [3, 6]
+                        )
+                        wait_time = random.uniform(stab_range[0], stab_range[1])
+                        time.sleep(wait_time)
                         continue  # Retry same batch with new IP
 
                 # Standard wait for non-TOR runs
@@ -563,8 +570,19 @@ class EmailHarvester:
                             description=f"[bold red]Disabled {self.activeEngine}: Structural block detected",
                         )
                 break
+            except ConnectivityError as e:
+                if self.progress_callback and self.task_id is not None:
+                    self.progress_callback(self.task_id, description=f"[bold red]FATAL: {e}")
+                self.status = SearchStatus.PARTIAL_BLOCKED
+                break
 
             self.counter += self.step
+
+            # [TI-05] Batch Jitter: Randomize interval between engine batches
+            batch_range = self.resilience._config.get("timing", {}).get("batch_pause_range", [1.0, 3.0])
+            jitter_pause = random.uniform(batch_range[0], batch_range[1])
+            time.sleep(jitter_pause)
+
             if self.progress_callback and self.task_id is not None:
                 self.progress_callback(
                     self.task_id, advance=self.step, description=f"[cyan]Searching in {self.activeEngine}..."

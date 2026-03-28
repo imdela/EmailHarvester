@@ -49,9 +49,9 @@ usage: EmailHarvester.py [-h] [-d DOMAIN] [-s FILE] [-e ENGINE] [-l LIMIT]
 
 options:
   -d, --domain      Target domain (e.g., payoneer.com)
-  -s, --save        Output filename (saves as FILE.txt). Streams in real-time.
+  -s, --save        Output filename. Defaults to DOMAIN.txt if not specified.
   -e, --engine      explicit engines (google, bing, all, etc)
-  -l, --limit       Total result limit per engine
+  -l, --limit       Search result offset limit (pagination) per engine
   -x, --proxy       HTTP/HTTPS proxy (e.g. http://127.0.0.1:8080)
   --tor             Enable TOR SOCKS5 proxy and IP rotation on blocks
   -r, --exclude     Exclude specific plugins from 'all'

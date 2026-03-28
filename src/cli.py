@@ -22,6 +22,7 @@ For more see the file 'LICENSE' for copying permission.
 """
 
 import argparse
+import random
 import sys
 import threading
 import time
@@ -255,7 +256,7 @@ def main() -> None:
     if args.tor:
         print(green("[+] TOR proxy enabled (127.0.0.1:9050)"))
 
-    filename = args.filename or ""
+    filename = args.filename or domain
     limit = args.limit
     engine = args.engine
 
@@ -279,7 +280,8 @@ def main() -> None:
     all_emails = []
     excluded = args.exclude.split(",") if args.exclude else []
 
-    plugins = EmailHarvester(userAgent, args.proxy, tor_enabled=args.tor).get_plugins()
+    app_core = EmailHarvester(userAgent, args.proxy, tor_enabled=args.tor)
+    plugins = app_core.get_plugins()
     engines_to_run = []
     if engine == "all":
         print(green("[+] Searching everywhere"))
@@ -322,11 +324,13 @@ def main() -> None:
                 )
                 future_to_engine[future] = engine_name
 
-                # Staggered Start (TI-11): Avoid burst detection (Human-like behavior)
+                # [TI-11] Staggered Start: Use jitter from stealth.yaml to avoid burst detection
                 if len(engines_to_run) > 1:
-                    import random
-
-                    time.sleep(random.uniform(0.2, 0.5))
+                    t_conf = app_core.resilience._config.get("timing", {})
+                    # Default to 0.1-0.3s if config fails
+                    j_min = t_conf.get("min_jitter_ms", 100) / 1000.0
+                    j_max = t_conf.get("max_jitter_ms", 500) / 1000.0
+                    time.sleep(random.uniform(j_min, j_max))
 
             for future in as_completed(future_to_engine):
                 engine_name = future_to_engine[future]
@@ -378,20 +382,11 @@ def main() -> None:
             print(emails)
 
     if filename:
+        # Note: TXT file is already written in real-time by save_email_callback (US-13).
+        # We only generate the XML file at the end to ensure a clean final set.
         try:
-            print(green("[+] Saving results to files"))
-            with open(filename, "w") as out_file:
-                for email in all_emails:
-                    try:
-                        out_file.write(email + "\n")
-                    except Exception as email_err:
-                        print(red("[-] Exception writing {}: {}".format(email, email_err)))
-        except Exception as e:
-            print(red("[-] Error saving TXT file: " + str(e)))
-
-        try:
-            filename = filename.split(".")[0] + ".xml"
-            with open(filename, "w") as out_file:
+            xml_filename = filename.split(".")[0] + ".xml"
+            with open(xml_filename, "w") as out_file:
                 out_file.write('<?xml version="1.0" encoding="UTF-8"?><EmailHarvester>')
                 for email in all_emails:
                     out_file.write("<email>{}</email>".format(email))

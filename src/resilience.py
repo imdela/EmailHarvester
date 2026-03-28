@@ -27,6 +27,10 @@ class ThreatLevel(StrEnum):
     BLACKLISTED = "BLACKLISTED"
 
 
+class ConnectivityError(Exception):
+    """Raised when the TOR proxy or direct network connection is fatally broken."""
+
+
 class ResilienceManager:
     """Centralized manager for shared scraping resilience and stealth pooling."""
 
@@ -139,12 +143,26 @@ class ResilienceManager:
         if not self.tor_enabled:
             return False
 
-        wait_time = self._config.get("resilience", {}).get("rotation_stabilization_s", 15)
-        print(colored(f"[*] Requesting new TOR identity (Cooldown: {wait_time}s)...", "yellow"))
+        t_conf = self._config.get("timing", {})
+        r_conf = self._config.get("resilience", {})
+
         try:
             with Controller.from_port(address=self.settings["host"], port=self.settings["control_port"]) as controller:
                 controller.authenticate(password=self.settings["password"])
+
+                # [FIX-RESEARCH] Use adaptive wait if configured
+                if r_conf.get("rotation_wait_strategy") == "adaptive":
+                    wait_needed = controller.get_newnym_wait()
+                    if wait_needed > 0:
+                        print(colored(f"[*] TOR rate-limit: Cooling down for {wait_needed:.1f}s...", "yellow"))
+                        time.sleep(wait_needed + 0.5)
+
                 controller.signal(Signal.NEWNYM)
+
+                # Randomized stabilization to avoid predictive patterns
+                stab_range = t_conf.get("circuit_stabilization_range", [3, 6])
+                wait_time = random.uniform(stab_range[0], stab_range[1])
+                print(colored(f"[*] Requesting new TOR identity (Stabilization: {wait_time:.1f}s)...", "yellow"))
                 time.sleep(wait_time)
                 return True
         except Exception as e:
@@ -180,13 +198,22 @@ class ResilienceManager:
         # "unknown" is a sentinel for failed IP detection — it is never a real circuit and
         # must NOT enter the USING pool to avoid infinite retry loops.
         r_conf = self._config.get("resilience", {})
+        max_ip_retries = 2
+        retry_count = 0
+
         while True:
             current_ip = self.get_current_ip()
             needs_rotate = False
 
-            # Bypass pool management when IP detection fails — proceed without tracking.
+            # [FIX-CONNECTIVITY] Handle failed IP detection with immediate rotation retry
             if current_ip == "unknown":
-                return current_ip
+                if retry_count < max_ip_retries:
+                    print(colored("[-] Failed to detect external IP. Attempting emergency rotation...", "yellow"))
+                    self.rotate_identity()
+                    retry_count += 1
+                    continue
+                else:
+                    raise ConnectivityError("Fatal: Unable to verify external IP after emergency rotation.")
 
             with ResilienceManager._lock:
                 data = ResilienceManager._shared_ip_cache.get(current_ip)

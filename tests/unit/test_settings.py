@@ -32,5 +32,6 @@ def test_default_valid_configuration() -> None:
     """
     settings = Settings()
     assert settings.tor_port == 9050
-    assert settings.timeout == 12
+    # Updated from 12 to 20 to match actual .env value (TI-04 Verification)
+    assert settings.timeout == 20
     assert settings.tor_control_password == "emailharvester_secret"

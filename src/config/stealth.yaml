@@ -1,18 +1,33 @@
 # Stealth and Resilience Configuration
-# Allows adjusting human simulation parameters without modifying code.
+# Controls human simulation and failure recovery to bypass anti-scraping filters.
 
 timing:
+  # Random jitter between individual engine requests (in ms)
   min_jitter_ms: 100
   max_jitter_ms: 500
+
+  # Staggered Start: Initial delay before the first engine starts (in seconds)
   start_progressive_delay_s: 3
-  progressive_delay_step_s: 2
-  progressive_delay_cap_s: 30
+
+  # Batch Jitter: Random pause between engine batches (e.g. Page 1, Page 2)
+  batch_pause_range: [1.0, 3.0]
+
+  # TOR Circuit Stabilization: Time to wait for Tor to build its 3-hop circuit after rotation
+  circuit_stabilization_range: [3.0, 6.0]
 
 burst:
-  threshold_requests: 6 # Number of cumulative requests before a burst rest
-  pause_duration_s: 5 # Human-like pause duration
+  # Global rate limiter: pausing after X total requests across all threads
+  threshold_requests: 6
+
+  # Pause duration when the burst threshold is reached
+  pause_duration_s: 5
 
 resilience:
+  # How long a blocked IP/circuit remains rejected before being re-tested (in minutes)
   quarantine_duration_min: 60
-  rotation_stabilization_s: 15
+
+  # Max cumulative failures for an IP before it is definitively blacklisted
   max_attempts_before_blacklist: 5
+
+  # Use Tor's internal rate-limit manager ('get_newnym_wait') instead of fixed sleeps
+  rotation_wait_strategy: "adaptive"
